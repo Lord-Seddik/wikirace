@@ -5,16 +5,10 @@ import { BestKnownPath, RunResultView, shareTextFor } from '../components/common
 import { Article, PathList, RaceHud, RaceTimer } from '../components/race';
 import { Button, ErrorBox, LinkButton, Modal, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
-import { confetti, sfx, syncClock, toast, useTitle } from '../lib/misc';
+import { confetti, plural, sfx, syncClock, toast, useTitle } from '../lib/misc';
 import { fetchPage, runCache, startRace } from '../lib/races';
 import { navigate } from '../lib/router';
 import { refreshMe, useMe } from '../lib/session';
-
-function modeLabel(run: RunView): string {
-  if (run.mode === 'daily') return `Daily #${run.dailyDate ? dailyNumber(run.dailyDate) : ''}${run.ranked ? '' : ' (practice)'}`;
-  if (run.mode === 'challenge') return `Challenge${run.ranked ? '' : ' (practice)'}`;
-  return run.difficulty === 'custom' ? 'Custom race' : `Solo · ${run.difficulty ?? ''}`;
-}
 
 export function RacePage({ id }: { id: string }) {
   const me = useMe();
@@ -120,9 +114,7 @@ export function RacePage({ id }: { id: string }) {
         onBack={() => move(run.stack[run.stack.length - 2], true)}
         onGiveUp={run.status === 'active' ? () => setConfirmQuit(true) : undefined}
         timer={<RaceTimer startedAt={run.startedAt} finishedAt={run.status === 'active' ? null : (run.finishedAt ?? Date.now())} />}
-      >
-        <span className="badge">{modeLabel(run)}</span>
-      </RaceHud>
+      />
       <div className="race-body">
         <Article page={page} loading={busy} onNavigate={(t) => move(t)} disabled={run.status !== 'active'} />
       </div>
@@ -147,28 +139,28 @@ export function RacePage({ id }: { id: string }) {
             shareUrl={shareUrl}
             actions={
               <>
-                <Button onClick={again}>🔁 {run.mode === 'solo' && run.difficulty !== 'custom' ? 'New race' : 'Play again'}</Button>
-                {run.mode === 'daily' && <LinkButton to="/daily">Daily leaderboard</LinkButton>}
-                {run.mode === 'challenge' && <LinkButton to={`/c/${run.challengeId}`}>Challenge leaderboard</LinkButton>}
-                <LinkButton to="/">Home</LinkButton>
+                {run.mode === 'daily' ? <LinkButton to="/daily">Today's results</LinkButton> : <Button onClick={again}>Another race</Button>}
+                <LinkButton to="/" variant="ghost">
+                  Home
+                </LinkButton>
               </>
             }
           />
         )}
       </Modal>
 
-      <Modal open={!!gaveUp} onClose={() => setGaveUp(null)} title="🏳 Race over" wide>
+      <Modal open={!!gaveUp} onClose={() => setGaveUp(null)} title="Race over" wide>
         <p className="muted">
-          You visited {run.path.length} pages. {gaveUp?.bestKnown ? 'Here is the shortest route anyone found:' : 'Nobody has solved this pair yet. Could be a tough one!'}
+          You visited {plural(run.path.length, 'page')}. {gaveUp?.bestKnown ? 'Here is the shortest route anyone found:' : 'Nobody has solved this pair yet. Could be a tough one!'}
         </p>
         <BestKnownPath best={gaveUp?.bestKnown ?? null} target={run.target} />
         <details className="best-known">
-          <summary>Your path ({run.path.length} pages)</summary>
+          <summary>Your path ({plural(run.path.length, 'page')})</summary>
           <PathList path={run.path} target={run.target} />
         </details>
         <div className="row-gap">
           <Button variant="primary" onClick={again}>
-            🔁 Try again
+            {run.mode === 'solo' && run.difficulty !== 'custom' ? 'Another race' : 'Try again'}
           </Button>
           <LinkButton to="/">Home</LinkButton>
         </div>

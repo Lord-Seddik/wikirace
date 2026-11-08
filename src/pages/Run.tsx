@@ -33,7 +33,7 @@ export function RunPage({ id }: { id: string }) {
           <h1>
             {run.start} → {run.target}
           </h1>
-          {player && <PlayerTag id={player.id} name={player.name} avatar={player.avatar} color={player.color} level={player.level} />}
+          {player && <PlayerTag name={player.name} avatar={player.avatar} color={player.color} link={false} />}
         </div>
       </header>
       <div className="pair">
@@ -72,7 +72,7 @@ export function RunPage({ id }: { id: string }) {
             </LinkButton>
           )}
           <Button variant={mine ? 'secondary' : 'primary'} onClick={tryIt}>
-            🏃 Race this route
+            Race these pages
           </Button>
           {mine && run.status !== 'active' && (
             <Button
@@ -82,7 +82,7 @@ export function RunPage({ id }: { id: string }) {
                 )
               }
             >
-              📋 Share
+              Share
             </Button>
           )}
         </div>

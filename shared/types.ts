@@ -330,7 +330,7 @@ export type ClientMessage =
 export type ServerMessage =
   | { t: 'state'; room: RoomView }
   | { t: 'emote'; pid: string; emoji: string }
-  | { t: 'toast'; text: string; kind?: 'info' | 'good' | 'bad' }
+  | { t: 'toast'; text: string; kind?: 'info' | 'good' | 'bad'; tag?: 'achievement' }
   | { t: 'error'; message: string; code?: string };
 
 export interface RoomMoveResponse {

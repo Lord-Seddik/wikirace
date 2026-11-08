@@ -317,6 +317,11 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket) {
+    try {
+      ws.close(1000, 'Bye');
+    } catch {
+      /* already closed */
+    }
     await this.leave(ws);
   }
 
@@ -860,7 +865,7 @@ export class GameRoom extends DurableObject<Env> {
       const fresh = await grant(this.env, s.pid, ids);
       for (const id of fresh) {
         const a = achievementById(id);
-        if (a) this.sendTo(s.pid, { t: 'toast', text: `${a.icon} Achievement unlocked: ${a.name}`, kind: 'good' });
+        if (a) this.sendTo(s.pid, { t: 'toast', text: `${a.icon} Achievement unlocked: ${a.name}`, kind: 'good', tag: 'achievement' });
       }
     }
   }

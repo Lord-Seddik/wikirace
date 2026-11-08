@@ -1,43 +1,45 @@
 import { useState } from 'react';
 import type { DailyInfo, LeaderboardEntry } from '../../shared/types';
-import { Leaderboard, shareTextFor } from '../components/common';
+import { shareTextFor } from '../components/common';
 import { PageCard } from '../components/race';
-import { Button, Card, ErrorBox, LinkButton, Segmented, Spinner } from '../components/ui';
-import { api, qs } from '../lib/api';
+import { Avatar, Button, Card, ErrorBox, LinkButton, Spinner } from '../components/ui';
+import { api } from '../lib/api';
 import { copyText, formatClock, formatDuration, ordinal, plural, toast, useAsync, useNow, useTitle } from '../lib/misc';
 import { startRace } from '../lib/races';
 import { useMe } from '../lib/session';
 
-export function Distribution({ data, mine }: { data: { clicks: number; count: number }[]; mine?: number | null }) {
-  if (!data.length) return <p className="muted">No finishers yet. The distribution shows up here.</p>;
-  const max = Math.max(...data.map((d) => d.count));
+/** Small "top today" list: rank, name, clicks, time. */
+function TopToday({ entries, me }: { entries: LeaderboardEntry[]; me?: string }) {
+  if (!entries.length) return <p className="muted">Nobody has finished yet. Be the first!</p>;
   return (
-    <div className="dist" role="img" aria-label="How many clicks people needed">
-      {data.map((d) => (
-        <div key={d.clicks} className={`dist-row${d.clicks === mine ? ' mine' : ''}`}>
-          <span className="dist-label">{d.clicks}</span>
-          <span className="dist-bar" style={{ width: `${Math.max(4, (d.count / max) * 100)}%` }}>
-            {d.count}
+    <ol className="top-list">
+      {entries.slice(0, 10).map((e) => (
+        <li key={e.playerId} className={e.playerId === me ? 'me' : ''}>
+          <span className="top-rank">{e.rank}</span>
+          <Avatar avatar={e.avatar} color={e.color} size={24} />
+          <span className="top-name">{e.name}</span>
+          <span className="top-num">
+            {plural(e.clicks ?? 0, 'click')} · {formatDuration(e.durationMs, false)}
           </span>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
 export function DailyPage() {
-  useTitle('Daily Challenge');
+  useTitle("Today's challenge");
   const me = useMe();
   const now = useNow(1000);
   const daily = useAsync(() => api<DailyInfo>('/api/daily'), [me?.id]);
-  const [sort, setSort] = useState<'clicks' | 'time'>('clicks');
-  const board = useAsync(() => api<{ entries: LeaderboardEntry[] }>(`/api/leaderboard/daily?${qs({ sort })}`), [sort, daily.data?.me?.status]);
+  const board = useAsync(() => api<{ entries: LeaderboardEntry[] }>('/api/leaderboard/daily'), [daily.data?.me?.status]);
   const [starting, setStarting] = useState(false);
 
   if (daily.error && !daily.data) return <ErrorBox error={daily.error} onRetry={daily.reload} />;
-  if (!daily.data) return <Spinner label="Loading today's challenge…" />;
+  if (!daily.data) return <Spinner />;
   const d = daily.data;
   const mine = d.me;
+  const done = mine && mine.status !== 'active';
 
   const play = async () => {
     setStarting(true);
@@ -53,124 +55,75 @@ export function DailyPage() {
     mine &&
     copyText(
       `${shareTextFor({ label: `Daily #${d.number}`, clicks: mine.clicks, durationMs: mine.durationMs ?? 0, start: d.start, target: d.target, gaveUp: mine.status === 'abandoned' })}\n${location.origin}/daily`,
-      'Result copied, paste it anywhere!',
+      'Copied! Paste it to your friends.',
     );
 
   return (
-    <div className="page daily">
-      <header className="page-head">
-        <div>
-          <span className="eyebrow">Daily Challenge #{d.number}</span>
-          <h1>Today's route</h1>
-          <p className="muted">
-            Same start and target for everyone. Your <b>first attempt</b> counts for the leaderboard, ranked by fewest clicks, then time. New puzzle in{' '}
-            <b>{formatClock(d.nextAt - now)}</b>.
-          </p>
-        </div>
+    <div className="page narrow daily">
+      <header className="center-head">
+        <span className="eyebrow">Today's challenge · #{d.number}</span>
+        <h1>Same pages for everyone</h1>
+        <p className="muted">Your first try counts. A new one arrives in {formatClock(d.nextAt - now)}.</p>
       </header>
 
       <div className="pair">
-        <PageCard lang={d.lang} title={d.start} role="start" />
+        <PageCard lang={d.lang} title={d.start} role="start" compact />
         <div className="pair-arrow" aria-hidden>
           →
         </div>
         <PageCard lang={d.lang} title={d.target} role="target" />
       </div>
 
-      <div className="daily-grid">
-        <Card className="daily-status">
-          {!mine && (
-            <div className="cta-block">
-              <h2>Ready?</h2>
-              <p className="muted">The clock starts the moment you press start. You can't pause, so find a quiet minute!</p>
-              <Button variant="primary" size="lg" onClick={play} loading={starting}>
-                ▶ Start the Daily
-              </Button>
-            </div>
-          )}
-          {mine?.status === 'active' && (
-            <div className="cta-block">
-              <h2>Race in progress</h2>
-              <p className="muted">Your clock is still running. Jump back in!</p>
-              <Button variant="primary" size="lg" onClick={play} loading={starting}>
-                ⏩ Resume ({plural(mine.clicks, 'click')} so far)
-              </Button>
-            </div>
-          )}
-          {mine && mine.status !== 'active' && (
-            <div className="cta-block">
-              <h2>{mine.status === 'finished' ? '✅ Solved!' : '🏳 You gave up today'}</h2>
+      <div className="daily-action">
+        {!mine && (
+          <>
+            <Button variant="primary" size="lg" onClick={play} loading={starting}>
+              Start
+            </Button>
+            <span className="muted small">The clock starts when you press Start.</span>
+          </>
+        )}
+        {mine?.status === 'active' && (
+          <>
+            <Button variant="primary" size="lg" onClick={play} loading={starting}>
+              Resume
+            </Button>
+            <span className="muted small">Your clock is still running.</span>
+          </>
+        )}
+        {done && (
+          <>
+            <p className="daily-result">
               {mine.status === 'finished' ? (
-                <div className="result-stats">
-                  <div>
-                    <b>{mine.clicks}</b>
-                    <span>clicks</span>
-                  </div>
-                  <div>
-                    <b>{formatDuration(mine.durationMs)}</b>
-                    <span>time</span>
-                  </div>
-                  <div>
-                    <b>{mine.rank ? ordinal(mine.rank) : '–'}</b>
-                    <span>of {d.stats.finishers}</span>
-                  </div>
-                </div>
+                <>
+                  You made it in <b>{plural(mine.clicks, 'click')}</b> and <b>{formatDuration(mine.durationMs, false)}</b>
+                  {mine.rank ? (
+                    <>
+                      {' '}
+                      · <b>{ordinal(mine.rank)}</b> of {d.stats.finishers}
+                    </>
+                  ) : null}
+                </>
               ) : (
-                <p className="muted">Come back tomorrow for a new route, or practice this one below.</p>
+                <>You gave up on today's challenge. Try again tomorrow!</>
               )}
-              <div className="row-gap">
-                <Button variant="primary" onClick={share}>
-                  📋 Share
-                </Button>
-                <LinkButton to={`/run/${mine.runId}`}>See my path</LinkButton>
-                <Button onClick={play} loading={starting} title="Play again. It won't change your leaderboard result.">
-                  🔁 Practice again
-                </Button>
-              </div>
+            </p>
+            <div className="row-gap center">
+              <Button variant="primary" onClick={share}>
+                Share
+              </Button>
+              <LinkButton to={`/run/${mine.runId}`}>See my path</LinkButton>
+              <Button variant="ghost" onClick={play} loading={starting}>
+                Play again (just for fun)
+              </Button>
             </div>
-          )}
-          <div className="daily-mini-stats">
-            <span>
-              👥 <b>{d.stats.players}</b> started
-            </span>
-            <span>
-              🏁 <b>{d.stats.finishers}</b> finished
-            </span>
-            <span>
-              📉 best <b>{d.stats.bestClicks ?? '–'}</b> clicks
-            </span>
-            <span>
-              ≈ avg <b>{d.stats.avgClicks ?? '–'}</b>
-            </span>
-          </div>
-          <h3 className="sub">Clicks needed</h3>
-          <Distribution data={d.stats.distribution} mine={mine?.status === 'finished' ? mine.clicks : null} />
-        </Card>
-
-        <Card
-          title="🏆 Today's leaderboard"
-          actions={
-            <Segmented
-              size="sm"
-              value={sort}
-              onChange={setSort}
-              options={[
-                { value: 'clicks', label: 'Fewest clicks' },
-                { value: 'time', label: 'Fastest' },
-              ]}
-            />
-          }
-        >
-          <Leaderboard
-            entries={board.data?.entries ?? []}
-            highlight={me?.id}
-            columns={[
-              { key: 'clicks', label: 'Clicks', render: (e) => e.clicks },
-              { key: 'time', label: 'Time', render: (e) => formatDuration(e.durationMs) },
-            ]}
-          />
-        </Card>
+          </>
+        )}
       </div>
+
+      <Card title="Top today">
+        <TopToday entries={board.data?.entries ?? []} me={me?.id} />
+      </Card>
     </div>
   );
 }

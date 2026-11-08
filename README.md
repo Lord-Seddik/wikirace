@@ -14,6 +14,13 @@ Live at **https://wikirace.seddikbachounda.com**
 - **Profiles**: guest accounts (no sign-up), name/avatar/color, XP and levels, 26 achievements, race and match history, and a *sync key* to continue on another device.
 - **Fair play**: every click is validated server-side against the real links of the page you were on, and finishing times are measured by the server.
 
+## Beta mode
+
+The public beta keeps things simple: **Start a race**, **Play with friends**, and **Today's challenge**.
+The other features above are still in the code (and the API keeps recording stats), just hidden.
+Turn any of them back on in [`src/lib/features.ts`](src/lib/features.ts): profiles, achievements, ranked
+Quick Match, leaderboards, custom challenges, public rooms, emotes, the full solo setup page, spectate switch.
+
 ## How it works
 
 One Cloudflare Worker serves everything:

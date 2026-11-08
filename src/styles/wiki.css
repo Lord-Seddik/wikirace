@@ -4,7 +4,8 @@
   position: relative;
   background: #fffefb;
   color: #202122;
-  border-radius: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
   padding: 28px clamp(16px, 4vw, 44px) 32px;
   box-shadow: var(--shadow);
   font: 16px/1.65 var(--font);

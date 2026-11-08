@@ -1,11 +1,14 @@
 /** Building blocks of the multiplayer room screens. */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DIFFICULTIES, DIFFICULTY_INFO, EMOTES, LANGS, THEMES, langInfo } from '../../shared/constants';
-import type { ChatMessage, ClientMessage, FinalStanding, RoomPlayer, RoomSettings, RoomView, RoundResult } from '../../shared/types';
+import type { ChatMessage, ClientMessage, FinalStanding, Me, RoomPlayer, RoomSettings, RoomView, RoundResult } from '../../shared/types';
 import { PagePicker } from '../components/PagePicker';
 import { PathList } from '../components/race';
 import { Avatar, Button, Card, Field, Segmented, Toggle } from '../components/ui';
-import { copyText, formatDuration, ordinal } from '../lib/misc';
+import { api } from '../lib/api';
+import { FEATURES } from '../lib/features';
+import { copyText, formatDuration, ordinal, toast } from '../lib/misc';
+import { setMe } from '../lib/session';
 import type { Emote } from '../lib/useRoom';
 import { Link } from '../lib/router';
 
@@ -19,7 +22,7 @@ export function RoomHeader({ room, connected, extra }: { room: RoomView; connect
       <div className="room-title">
         <span className={`conn-dot${connected ? ' on' : ''}`} title={connected ? 'Connected' : 'Reconnecting…'} />
         <h1>{room.settings.name}</h1>
-        {room.ranked && <span className="badge badge-ranked">⚔️ Ranked</span>}
+        {room.ranked && <span className="badge badge-ranked">Ranked</span>}
         {room.status !== 'lobby' && (
           <span className="badge">
             Round {Math.max(1, round)}/{room.settings.rounds}
@@ -43,51 +46,90 @@ export function RoomHeader({ room, connected, extra }: { room: RoomView; connect
   );
 }
 
-export function PlayersPanel({ room, send }: { room: RoomView; send: Send }) {
+function NameEdit({ name, onSaved }: { name: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [busy, setBusy] = useState(false);
+  if (!editing) {
+    return (
+      <button
+        className="link-btn"
+        onClick={() => {
+          setValue(name);
+          setEditing(true);
+        }}
+      >
+        change name
+      </button>
+    );
+  }
+  const save = async () => {
+    setBusy(true);
+    try {
+      setMe(await api<Me>('/api/me', { method: 'PATCH', body: { name: value } }));
+      setEditing(false);
+      onSaved();
+    } catch (e) {
+      toast((e as Error).message, 'bad');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className="name-edit"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <input className="input" value={value} maxLength={20} autoFocus onChange={(e) => setValue(e.target.value)} aria-label="Your name" />
+      <Button size="sm" type="submit" variant="primary" loading={busy}>
+        Save
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+        Cancel
+      </Button>
+    </form>
+  );
+}
+
+export function PlayersPanel({ room, send, onRename }: { room: RoomView; send: Send; onRename: () => void }) {
   const isHost = room.hostId === room.you && !room.ranked;
   const racers = room.players.filter((p) => !p.spectator);
   const watchers = room.players.filter((p) => p.spectator);
   const me = room.players.find((p) => p.id === room.you);
   const row = (p: RoomPlayer) => (
     <li key={p.id} className={`lobby-player${p.connected ? '' : ' offline'}${p.id === room.you ? ' me' : ''}`}>
-      <Avatar avatar={p.avatar} color={p.color} size={38} />
+      <Avatar avatar={p.avatar} color={p.color} size={36} />
       <span className="lp-name">
-        <b>
-          {p.name}
-          {p.id === room.hostId && <span title="Host"> 👑</span>}
-        </b>
+        <b>{p.name}</b>
         <small>
-          Lv {p.level} · {p.rating}
-          {!p.connected && ' · offline'}
-          {p.id === room.you && ' · you'}
+          {[p.id === room.hostId && 'host', p.id === room.you && 'you', !p.connected && 'offline'].filter(Boolean).join(' · ')}
+          {p.id === room.you && !room.ranked && (
+            <>
+              {' · '}
+              <NameEdit name={p.name} onSaved={onRename} />
+            </>
+          )}
         </small>
       </span>
       {isHost && p.id !== room.you && (
-        <span className="lp-actions">
-          <button className="icon-btn" title="Make host" onClick={() => send({ t: 'transfer', pid: p.id })}>
-            👑
-          </button>
-          <button className="icon-btn" title="Remove from room" onClick={() => confirm(`Remove ${p.name} from the room?`) && send({ t: 'kick', pid: p.id })}>
-            ✕
-          </button>
-        </span>
+        <button className="icon-btn" title={`Remove ${p.name}`} onClick={() => confirm(`Remove ${p.name} from the room?`) && send({ t: 'kick', pid: p.id })}>
+          ✕
+        </button>
       )}
     </li>
   );
   return (
     <Card
-      title={`Racers (${racers.length}/${room.settings.maxPlayers})`}
-      actions={
-        !room.ranked &&
-        me && (
-          <Toggle checked={me.spectator} onChange={(on) => send({ t: 'spectate', on })} label="Spectate" />
-        )
-      }
+      title={`Players (${racers.length})`}
+      actions={FEATURES.spectate && !room.ranked && me && <Toggle checked={me.spectator} onChange={(on) => send({ t: 'spectate', on })} label="Spectate" />}
     >
       <ul className="lobby-players">{racers.map(row)}</ul>
       {watchers.length > 0 && (
         <>
-          <h3 className="sub">👀 Spectators</h3>
+          <h3 className="sub">Watching</h3>
           <ul className="lobby-players">{watchers.map(row)}</ul>
         </>
       )}
@@ -188,33 +230,21 @@ export function SettingsPanel({ room, send }: { room: RoomView; send: Send }) {
 
   if (room.ranked) {
     return (
-      <Card title="⚔️ Ranked rules">
+      <Card title="Ranked rules">
         <ul className="rules-list">
-          <li>1 round · {Math.round(s.timeLimit / 60)} min · {DIFFICULTY_INFO[s.difficulty].label}</li>
+          <li>
+            1 round · {Math.round(s.timeLimit / 60)} min · {DIFFICULTY_INFO[s.difficulty].label}
+          </li>
           <li>First to reach the target wins. Others get {s.finishWindow}s after the first finish.</li>
-          <li>You see opponents' click counts, not their pages.</li>
-          <li>Rating changes against every opponent (Elo).</li>
         </ul>
       </Card>
     );
   }
 
   return (
-    <Card title={editable ? '⚙️ Room settings' : '⚙️ Rules (set by the host)'}>
+    <Card title={editable ? 'Game settings' : 'Game settings (set by the host)'}>
       <div className="settings">
-        <Field label="Room name">
-          <input className="input" value={name} disabled={!editable} maxLength={40} onChange={(e) => setName(e.target.value)} onBlur={() => name !== s.name && set({ name })} />
-        </Field>
-        <div className="form-grid">
-          <Field label="Language">
-            <select className="input" value={s.lang} disabled={!editable} onChange={(e) => set({ lang: e.target.value as RoomSettings['lang'] })}>
-              {LANGS.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <div className="form-grid form-grid-2">
           <Field label="Rounds">
             <select className="input" value={s.rounds} disabled={!editable} onChange={(e) => set({ rounds: Number(e.target.value) })}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 10].map((n) => (
@@ -224,7 +254,7 @@ export function SettingsPanel({ room, send }: { room: RoomView; send: Send }) {
               ))}
             </select>
           </Field>
-          <Field label="Time limit">
+          <Field label="Time per round">
             <select className="input" value={s.timeLimit} disabled={!editable} onChange={(e) => set({ timeLimit: Number(e.target.value) })}>
               {[60, 120, 180, 300, 420, 600, 900, 1800].map((n) => (
                 <option key={n} value={n}>
@@ -233,75 +263,83 @@ export function SettingsPanel({ room, send }: { room: RoomView; send: Send }) {
               ))}
             </select>
           </Field>
-          <Field label="Max racers">
-            <select className="input" value={s.maxPlayers} disabled={!editable} onChange={(e) => set({ maxPlayers: Number(e.target.value) })}>
-              {[2, 3, 4, 5, 6, 8, 10, 12, 16].map((n) => (
-                <option key={n} value={n}>
-                  {n}
+          <Field label="Difficulty">
+            <select className="input" value={s.difficulty} disabled={!editable} onChange={(e) => set({ difficulty: e.target.value as RoomSettings['difficulty'] })}>
+              {DIFFICULTIES.map((d) => (
+                <option key={d} value={d}>
+                  {DIFFICULTY_INFO[d].label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Language">
+            <select className="input" value={s.lang} disabled={!editable} onChange={(e) => set({ lang: e.target.value as RoomSettings['lang'] })}>
+              {LANGS.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name}
                 </option>
               ))}
             </select>
           </Field>
         </div>
-        <Field label="Difficulty">
-          <Segmented
-            value={s.difficulty}
-            disabled={!editable}
-            onChange={(difficulty) => set({ difficulty })}
-            options={DIFFICULTIES.map((d) => ({ value: d, label: `${DIFFICULTY_INFO[d].icon} ${DIFFICULTY_INFO[d].label}`, title: DIFFICULTY_INFO[d].blurb }))}
-          />
-        </Field>
-        {(
-          <Field label="Theme">
-            <select className="input" value={s.theme} disabled={!editable} onChange={(e) => set({ theme: e.target.value as RoomSettings['theme'] })}>
-              {THEMES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.icon} {t.name}
-                </option>
-              ))}
-            </select>
+        <details className="more-rules">
+          <summary>More rules</summary>
+          <Field label="Who wins a round?">
+            <Segmented
+              value={s.winBy}
+              disabled={!editable}
+              onChange={(winBy) => set({ winBy })}
+              options={[
+                { value: 'speed', label: 'Fastest' },
+                { value: 'clicks', label: 'Fewest clicks' },
+              ]}
+            />
           </Field>
-        )}
-        <Field label="Who wins a round?">
-          <Segmented
-            value={s.winBy}
-            disabled={!editable}
-            onChange={(winBy) => set({ winBy })}
-            options={[
-              { value: 'speed', label: '⚡ Fastest' },
-              { value: 'clicks', label: '🎯 Fewest clicks' },
-            ]}
-          />
-        </Field>
-        <Field label="During the race, you can see opponents'…">
-          <Segmented
-            value={s.visibility}
-            disabled={!editable}
-            onChange={(visibility) => set({ visibility })}
-            options={[
-              { value: 'full', label: 'Pages' },
-              { value: 'clicks', label: 'Clicks only' },
-              { value: 'none', label: 'Nothing' },
-            ]}
-          />
-        </Field>
-        <Field label="After the first finish, others get…">
-          <select className="input" value={s.finishWindow} disabled={!editable} onChange={(e) => set({ finishWindow: Number(e.target.value) })}>
-            <option value={0}>The full time limit</option>
-            {[15, 30, 60, 90, 120, 180].map((n) => (
-              <option key={n} value={n}>
-                {n} seconds
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="toggles">
-          <Toggle checked={s.noBack} disabled={!editable} onChange={(noBack) => set({ noBack })} label="No Back button" hint="Hardcore: every click is final" />
-          <Toggle checked={s.isPublic} disabled={!editable} onChange={(isPublic) => set({ isPublic })} label="Public room" hint="Listed on the home page" />
-        </div>
-        <Field label="Banned pages">
-          <BannedEditor banned={s.banned} disabled={!editable} onChange={(banned) => set({ banned })} />
-        </Field>
+          <Field label="While racing, you can see the others'">
+            <Segmented
+              value={s.visibility}
+              disabled={!editable}
+              onChange={(visibility) => set({ visibility })}
+              options={[
+                { value: 'full', label: 'Pages' },
+                { value: 'clicks', label: 'Clicks only' },
+                { value: 'none', label: 'Nothing' },
+              ]}
+            />
+          </Field>
+          <div className="form-grid form-grid-2">
+            <Field label="Theme">
+              <select className="input" value={s.theme} disabled={!editable} onChange={(e) => set({ theme: e.target.value as RoomSettings['theme'] })}>
+                {THEMES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="After someone finishes">
+              <select className="input" value={s.finishWindow} disabled={!editable} onChange={(e) => set({ finishWindow: Number(e.target.value) })}>
+                <option value={0}>Keep the full time</option>
+                {[15, 30, 60, 90, 120, 180].map((n) => (
+                  <option key={n} value={n}>
+                    Others get {n}s
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="toggles">
+            <Toggle checked={s.noBack} disabled={!editable} onChange={(noBack) => set({ noBack })} label="No Back button" />
+            {FEATURES.publicRooms && <Toggle checked={s.isPublic} disabled={!editable} onChange={(isPublic) => set({ isPublic })} label="Public room" />}
+          </div>
+          <Field label="Banned pages">
+            <BannedEditor banned={s.banned} disabled={!editable} onChange={(banned) => set({ banned })} />
+          </Field>
+          <Field label="Room name">
+            <input className="input" value={name} disabled={!editable} maxLength={40} onChange={(e) => setName(e.target.value)} onBlur={() => name !== s.name && set({ name })} />
+          </Field>
+          <PairPanel room={room} send={send} />
+        </details>
       </div>
     </Card>
   );
@@ -313,11 +351,11 @@ export function PairPanel({ room, send }: { room: RoomView; send: Send }) {
   const [target, setTarget] = useState(room.nextPair?.target ?? '');
   if (room.ranked) return null;
   if (!isHost) {
-    return room.hasCustomPair ? <p className="muted small">🤫 The host picked secret pages for the next round.</p> : null;
+    return room.hasCustomPair ? <p className="muted small">The host picked secret pages for the next round.</p> : null;
   }
   return (
     <details className="pair-panel" open={!!room.nextPair}>
-      <summary>✍️ Choose the pages for the next round (instead of random)</summary>
+      <summary>Choose the pages yourself (instead of random)</summary>
       <div className="form-grid">
         <PagePicker lang={room.settings.lang} value={start} onChange={setStart} label="Start" />
         <PagePicker lang={room.settings.lang} value={target} onChange={setTarget} label="Target" />

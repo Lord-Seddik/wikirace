@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientMessage, RoomView, ServerMessage } from '../../shared/types';
 import { ApiError, api } from './api';
 import { sfx, syncClock, toast } from './misc';
+import { FEATURES } from './features';
 import { ensureMe } from './session';
 
 export interface Emote {
@@ -26,6 +27,7 @@ export function useRoom(code: string) {
   const ticket = useRef<string | null>(null);
   const ws = useRef<WebSocket | null>(null);
   const lastChat = useRef(0);
+  const reconnectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let stopped = false;
@@ -94,6 +96,7 @@ export function useRoom(code: string) {
             break;
           }
           case 'toast':
+            if (msg.tag === 'achievement' && !FEATURES.achievements) break;
             toast(msg.text, msg.kind ?? 'info');
             break;
           case 'error':
@@ -115,6 +118,25 @@ export function useRoom(code: string) {
       };
     }
 
+    reconnectRef.current = () => {
+      const old = ws.current;
+      ticket.current = null;
+      clearTimeout(reconnectTimer);
+      clearInterval(pingTimer);
+      if (old) {
+        old.onclose = null;
+        old.onmessage = null;
+        ws.current = null;
+        try {
+          old.close(1000, 'Refreshing');
+        } catch {
+          /* already closed */
+        }
+      }
+      retry = 0;
+      connect();
+    };
+
     connect();
     return () => {
       stopped = true;
@@ -131,5 +153,8 @@ export function useRoom(code: string) {
     else toast('Reconnecting to the room…', 'bad');
   }, []);
 
-  return { room, connected, fatal, emotes, send, ticket };
+  /** Reconnect with a fresh pass, e.g. after renaming yourself. */
+  const reconnect = useCallback(() => reconnectRef.current(), []);
+
+  return { room, connected, fatal, emotes, send, ticket, reconnect };
 }

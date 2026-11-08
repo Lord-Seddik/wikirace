@@ -65,6 +65,11 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket) {
+    try {
+      ws.close(1000, 'Bye');
+    } catch {
+      /* already closed */
+    }
     await this.evaluate(ws);
   }
 

@@ -7,6 +7,7 @@ import { copyText, formatDuration, ordinal, plural, toast, toasts } from '../lib
 import { Link } from '../lib/router';
 import { setMe, applySyncKey } from '../lib/session';
 import { getToken } from '../lib/api';
+import { FEATURES } from '../lib/features';
 import { useStore } from '../lib/store';
 import { PathList } from './race';
 import { Avatar, Button, Empty, Field, Modal } from './ui';
@@ -14,16 +15,10 @@ import { Avatar, Button, Empty, Field, Modal } from './ui';
 export function Logo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="logo-mark">
-      <defs>
-        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#7c5cff" />
-          <stop offset="1" stopColor="#22d3ee" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="16" fill="#0b1020" />
-      <path d="M14 44 C 24 44, 22 22, 32 22 S 40 40, 50 20" fill="none" stroke="url(#lg)" strokeWidth="5" strokeLinecap="round" />
-      <circle cx="14" cy="44" r="6" fill="#7c5cff" />
-      <circle cx="50" cy="20" r="6" fill="#22d3ee" />
+      <rect width="64" height="64" rx="16" fill="#3366cc" />
+      <path d="M14 44 C 24 44, 22 22, 32 22 S 40 40, 50 20" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="14" cy="44" r="6" fill="#fff" />
+      <circle cx="50" cy="20" r="6.5" fill="#4ade80" stroke="#fff" strokeWidth="2" />
     </svg>
   );
 }
@@ -153,7 +148,7 @@ export function RunResultView({
     <div className="result">
       <div className="result-hero">
         <div className="result-emoji" aria-hidden>
-          🏁
+          🎉
         </div>
         <h2>{title ?? 'You made it!'}</h2>
         <div className="result-stats">
@@ -171,14 +166,16 @@ export function RunResultView({
               <span>of {result.total}</span>
             </div>
           )}
-          <div>
-            <b>+{result.xpGained}</b>
-            <span>XP</span>
-          </div>
+          {FEATURES.profiles && (
+            <div>
+              <b>+{result.xpGained}</b>
+              <span>XP</span>
+            </div>
+          )}
         </div>
-        {result.streak != null && <p className="streak-line">🔥 Daily streak: {plural(result.streak, 'day')}</p>}
+        {FEATURES.profiles && result.streak != null && <p className="streak-line">🔥 Daily streak: {plural(result.streak, 'day')}</p>}
       </div>
-      {result.newAchievements.length > 0 && (
+      {FEATURES.achievements && result.newAchievements.length > 0 && (
         <div className="result-section">
           <h3>New achievements</h3>
           <AchievementList ids={result.newAchievements} />
@@ -192,7 +189,7 @@ export function RunResultView({
       <div className="result-actions">
         {shareText && (
           <Button variant="primary" onClick={() => copyText(shareUrl ? `${shareText}\n${shareUrl}` : shareText, 'Result copied, paste it anywhere!')}>
-            📋 Share result
+            Share
           </Button>
         )}
         {actions}

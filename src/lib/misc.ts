@@ -193,7 +193,7 @@ export function useNow(ms = 1000): number {
 
 export function useTitle(title: string) {
   useEffect(() => {
-    document.title = title ? `${title} · WikiRace` : 'WikiRace: race across Wikipedia';
+    document.title = title ? `${title} · WikiRace` : 'WikiRace: get from one Wikipedia page to another';
   }, [title]);
 }
 

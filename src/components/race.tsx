@@ -109,14 +109,14 @@ export function RaceTimer({ startedAt, endsAt, finishedAt, compact }: { startedA
     const left = endsAt - t;
     return (
       <span className={`timer${left < 30_000 ? ' timer-danger' : ''}`} title="Time left">
-        ⏳ {formatClock(Math.max(0, left))}
+        {formatClock(Math.max(0, left))} left
       </span>
     );
   }
   const elapsed = Math.max(0, t - startedAt);
   return (
     <span className="timer" title="Time">
-      ⏱ {compact ? formatClock(elapsed) : formatDuration(elapsed)}
+      {compact ? formatClock(elapsed) : formatDuration(elapsed)}
     </span>
   );
 }
@@ -207,12 +207,12 @@ export function RaceHud({
             →
           </span>
           <button className="hud-target" onClick={() => setPeek((p) => !p)} title="Show what the target is about" aria-expanded={peek}>
-            🎯 {target}
+            <span className="hud-target-label">Target</span> {target}
           </button>
         </div>
         <div className="hud-stats">
           <span className="clicks" title="Clicks">
-            🖱 <b>{clicks}</b>
+            <b>{clicks}</b> {clicks === 1 ? 'click' : 'clicks'}
           </span>
           {timer}
         </div>
@@ -225,7 +225,7 @@ export function RaceHud({
           )}
           {onGiveUp && (
             <Button size="sm" variant="ghost" onClick={onGiveUp}>
-              🏳 Give up
+              Give up
             </Button>
           )}
         </div>

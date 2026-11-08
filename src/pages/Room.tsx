@@ -7,24 +7,22 @@ import { confetti, copyText, formatDuration, ordinal, plural, sfx, toast, useNow
 import { fetchPage } from '../lib/races';
 import { Link } from '../lib/router';
 import { useRoom, type Emote } from '../lib/useRoom';
-import { ChatBox, EmoteBar, LiveBoard, PairPanel, PlayersPanel, Podium, RoomHeader, RoundTable, RulesSummary, Scoreboard, SettingsPanel } from './RoomParts';
+import { FEATURES } from '../lib/features';
+import { ChatBox, EmoteBar, LiveBoard, PairPanel, PlayersPanel, Podium, RoomHeader, RoundTable, Scoreboard, SettingsPanel } from './RoomParts';
 
 type Send = (m: ClientMessage) => void;
 
 export function RoomPage({ code }: { code: string }) {
-  const { room, connected, fatal, emotes, send, ticket } = useRoom(code);
+  const { room, connected, fatal, emotes, send, ticket, reconnect } = useRoom(code);
   useTitle(room?.settings.name ?? `Room ${code}`);
 
   if (fatal) {
     return (
       <div className="page narrow">
         <Empty icon="🚪" title={fatal}>
-          <div className="row-gap center">
-            <LinkButton to="/" variant="primary">
-              Home
-            </LinkButton>
-            <LinkButton to="/quick">Quick Match</LinkButton>
-          </div>
+          <LinkButton to="/" variant="primary">
+            Back to home
+          </LinkButton>
         </Empty>
       </div>
     );
@@ -36,7 +34,7 @@ export function RoomPage({ code }: { code: string }) {
   return (
     <div className="page wide room-page">
       <RoomHeader room={room} connected={connected} />
-      {room.status === 'lobby' && <Lobby room={room} send={send} />}
+      {room.status === 'lobby' && <Lobby room={room} send={send} onRename={reconnect} />}
       {room.status === 'roundEnd' && <RoundEnd room={room} send={send} />}
       {room.status === 'finished' && <GameOver room={room} send={send} />}
     </div>
@@ -48,13 +46,13 @@ function InviteCard({ room }: { room: RoomView }) {
   return (
     <Card className="invite">
       <div>
-        <span className="eyebrow">Invite friends</span>
+        <span className="eyebrow">Invite your friends</span>
         <div className="invite-code">{room.code}</div>
-        <p className="muted small">Share the code, or send the link. Anyone with it can join.</p>
+        <p className="muted small">Send them the link, or tell them the code.</p>
       </div>
       <div className="invite-actions">
         <Button variant="primary" onClick={() => copyText(link, 'Invite link copied!')}>
-          🔗 Copy link
+          Copy invite link
         </Button>
         <Button onClick={() => copyText(room.code, 'Code copied!')}>Copy code</Button>
       </div>
@@ -62,7 +60,7 @@ function InviteCard({ room }: { room: RoomView }) {
   );
 }
 
-function Lobby({ room, send }: { room: RoomView; send: Send }) {
+function Lobby({ room, send, onRename }: { room: RoomView; send: Send; onRename: () => void }) {
   const isHost = room.hostId === room.you && !room.ranked;
   const now = useNow(250);
   const racing = room.players.filter((p) => p.connected && !p.spectator).length;
@@ -79,36 +77,33 @@ function Lobby({ room, send }: { room: RoomView; send: Send }) {
             </div>
             <div>
               <h2>{room.preparing ? 'Picking the pages…' : room.autoStartAt ? `Starting in ${Math.max(0, Math.ceil((room.autoStartAt - now) / 1000))}s` : 'Starting…'}</h2>
-              <p className="muted">The race begins when everyone has joined (or in a few seconds).</p>
+              <p className="muted">The race begins when everyone has joined.</p>
             </div>
           </Card>
         ) : (
           <InviteCard room={room} />
         )}
-        <PlayersPanel room={room} send={send} />
-        <Card title="💬 Chat">
-          <ChatBox chat={room.chat} send={send} />
-        </Card>
-      </div>
-      <div className="lobby-side">
-        <SettingsPanel room={room} send={send} />
-        <PairPanel room={room} send={send} />
+        <PlayersPanel room={room} send={send} onRename={onRename} />
         {!room.ranked && (
           <div className="start-box">
             {isHost ? (
               <>
                 <Button variant="primary" size="lg" onClick={() => send({ t: 'start' })} loading={room.preparing} disabled={racing < 1}>
-                  ▶ Start game
+                  Start the game
                 </Button>
-                <span className="muted small">
-                  {plural(racing, 'racer')} ready{racing < 2 ? ' · you can start alone to try it out' : ''}
-                </span>
+                <span className="muted small">{racing < 2 ? 'Waiting for friends? You can also start alone to try it.' : `${plural(racing, 'player')} ready`}</span>
               </>
             ) : (
-              <p className="muted">⏳ Waiting for {host ? `${host.name} (host)` : 'the host'} to start the game…</p>
+              <p className="muted">Waiting for {host ? host.name : 'the host'} to start the game…</p>
             )}
           </div>
         )}
+      </div>
+      <div className="lobby-side">
+        <SettingsPanel room={room} send={send} />
+        <Card title="Chat">
+          <ChatBox chat={room.chat} send={send} />
+        </Card>
       </div>
     </div>
   );
@@ -269,11 +264,11 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
           )}
         </div>
         <aside className={`race-side${sideOpen ? ' open' : ''}`}>
-          <Card title="Live" actions={<RulesSummary s={room.settings} />}>
+          <Card title="Live">
             <LiveBoard room={room} emotes={emotes} onWatch={!participant || done ? setWatch : undefined} watching={watch} />
           </Card>
-          <EmoteBar send={send} />
-          <Card title="💬 Chat" className="side-chat">
+          {FEATURES.emotes && <EmoteBar send={send} />}
+          <Card title="Chat" className="side-chat">
             <ChatBox chat={room.chat} send={send} compact />
           </Card>
         </aside>
@@ -324,19 +319,19 @@ function RoundEnd({ room, send }: { room: RoomView; send: Send }) {
           <RoundTable round={last} />
           <p className="muted small">Tap a player to see their path.</p>
         </Card>
-        <Card title="💬 Chat">
+        <Card title="Chat">
           <ChatBox chat={room.chat} send={send} />
         </Card>
       </div>
       <div className="lobby-side">
-        <Card title="📊 Scoreboard">
+        <Card title="Scores">
           <Scoreboard room={room} />
         </Card>
         <Card className="next-round">
           <h3>{room.preparing ? 'Picking pages…' : `Round ${last.index + 2} starts in ${secs ?? '…'}s`}</h3>
           {isHost && (
             <Button variant="primary" onClick={() => send({ t: 'next' })} loading={room.preparing}>
-              ⏩ Start now
+              Start now
             </Button>
           )}
           <PairPanel room={room} send={send} />
@@ -360,9 +355,9 @@ function GameOver({ room, send }: { room: RoomView; send: Send }) {
   return (
     <div className="lobby">
       <div className="lobby-main">
-        <Card title="🏆 Final results">
+        <Card title="Final results">
           {standings.length ? <Podium standings={standings} ranked={room.ranked} /> : <Empty icon="🤷" title="Nobody raced." />}
-          {room.ranked && mine?.ratingAfter != null && mine.ratingBefore != null && (
+          {FEATURES.ranked && room.ranked && mine?.ratingAfter != null && mine.ratingBefore != null && (
             <p className={`rating-line ${mine.ratingAfter >= mine.ratingBefore ? 'up' : 'down'}`}>
               Your rating: {mine.ratingBefore} → <b>{mine.ratingAfter}</b> ({mine.ratingAfter >= mine.ratingBefore ? '+' : ''}
               {mine.ratingAfter - mine.ratingBefore})
@@ -372,18 +367,18 @@ function GameOver({ room, send }: { room: RoomView; send: Send }) {
             {isHost && (
               <>
                 <Button variant="primary" onClick={() => send({ t: 'start' })} loading={room.preparing}>
-                  🔁 Play again
+                  Play again
                 </Button>
-                <Button onClick={() => send({ t: 'reset' })}>⚙️ Back to lobby</Button>
+                <Button onClick={() => send({ t: 'reset' })}>Change settings</Button>
               </>
             )}
-            {room.ranked && (
+            {FEATURES.ranked && room.ranked && (
               <LinkButton to="/quick" variant="primary">
                 ⚔️ Find another match
               </LinkButton>
             )}
             {!isHost && !room.ranked && <span className="muted">Waiting for the host to start another game…</span>}
-            {room.matchId && <Link to={`/match/${room.matchId}`}>Permanent results page →</Link>}
+            {FEATURES.profiles && room.matchId && <Link to={`/match/${room.matchId}`}>Permanent results page →</Link>}
           </div>
         </Card>
         {room.history.map((h) => (
@@ -396,7 +391,7 @@ function GameOver({ room, send }: { room: RoomView; send: Send }) {
         ))}
       </div>
       <div className="lobby-side">
-        <Card title="💬 Chat">
+        <Card title="Chat">
           <ChatBox chat={room.chat} send={send} />
         </Card>
       </div>
