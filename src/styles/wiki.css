@@ -1,0 +1,568 @@
+/* The article "paper": always light, Wikipedia-like typography, so templates with
+   hard-coded colors (infoboxes, navboxes, tables) look right in both app themes. */
+.paper {
+  position: relative;
+  background: #fffefb;
+  color: #202122;
+  border-radius: 18px;
+  padding: 28px clamp(16px, 4vw, 44px) 32px;
+  box-shadow: var(--shadow);
+  font: 16px/1.65 var(--font);
+  overflow: hidden;
+  color-scheme: light;
+  transition: filter 0.3s ease;
+}
+.paper.is-blurred {
+  filter: blur(9px);
+  pointer-events: none;
+  user-select: none;
+}
+.paper.is-loading .wiki {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.paper-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+}
+.paper-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--grad);
+  animation: progress 0.9s ease-in-out infinite;
+}
+.paper-title {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(1.7rem, 3.6vw, 2.2rem);
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.1em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid #a2a9b1;
+  color: #000;
+}
+.paper-sub {
+  font-size: 0.85rem;
+  color: #54595d;
+  margin: 0.4em 0 1.2em;
+}
+.paper-foot {
+  clear: both;
+  margin-top: 2.5em;
+  padding-top: 1em;
+  border-top: 1px solid #eaecf0;
+  font-size: 0.8rem;
+  color: #54595d;
+}
+.paper-foot a {
+  color: #3366cc;
+}
+.paper-loading {
+  min-height: 70vh;
+}
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0f4 0%, #f7f8fa 50%, #eef0f4 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+  margin-bottom: 14px;
+}
+.skeleton-title {
+  height: 38px;
+  width: 50%;
+  margin-bottom: 28px;
+}
+.skeleton-line {
+  height: 14px;
+}
+
+/* ---------------------------------------------------------------- content */
+.wiki {
+  word-wrap: break-word;
+}
+.wiki::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+.wiki a {
+  color: inherit;
+  text-decoration: none;
+}
+.wiki a[data-to] {
+  color: #3366cc;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.wiki a[data-to]:hover {
+  text-decoration: underline;
+  background: rgba(51, 102, 204, 0.08);
+}
+.wiki a[data-to].mw-redirect {
+  color: #3366cc;
+}
+.wiki a[data-anchor] {
+  color: #3366cc;
+  cursor: pointer;
+}
+.wiki a[data-dead] {
+  cursor: default;
+}
+.wiki p {
+  margin: 0.5em 0 1em;
+}
+.wiki p:empty {
+  display: none;
+}
+.wiki h2,
+.wiki h3,
+.wiki h4,
+.wiki h5,
+.wiki h6 {
+  color: #000;
+  font-family: var(--font);
+  letter-spacing: 0;
+  overflow: hidden;
+}
+.wiki h2 {
+  font-family: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 1.6em;
+  margin: 1.2em 0 0.4em;
+  padding-bottom: 0.15em;
+  border-bottom: 1px solid #a2a9b1;
+}
+.wiki h3 {
+  font-size: 1.2em;
+  font-weight: 700;
+  margin: 1em 0 0.3em;
+}
+.wiki h4 {
+  font-size: 1.05em;
+  font-weight: 700;
+  margin: 0.9em 0 0.3em;
+}
+.wiki .mw-heading {
+  clear: none;
+}
+.wiki ul,
+.wiki ol {
+  margin: 0.3em 0 0.8em 1.6em;
+  padding: 0;
+}
+.wiki li {
+  margin-bottom: 0.15em;
+}
+.wiki dl {
+  margin: 0.3em 0 0.6em;
+}
+.wiki dd {
+  margin-left: 1.6em;
+}
+.wiki blockquote {
+  margin: 1em 1.6em;
+  padding: 0 0 0 1em;
+  border-left: 3px solid #c8ccd1;
+}
+.wiki img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+.wiki sup,
+.wiki sub {
+  line-height: 1;
+}
+.wiki sup.reference {
+  font-size: 0.72em;
+  white-space: nowrap;
+}
+.wiki .hatnote,
+.wiki .dablink,
+.wiki .rellink {
+  font-style: italic;
+  padding-left: 1.6em;
+  margin: 0 0 0.6em;
+  color: #54595d;
+  font-size: 0.95em;
+}
+.wiki .hatnote i {
+  font-style: normal;
+}
+
+/* infoboxes & sidebars */
+.wiki .infobox,
+.wiki .sidebar,
+.wiki .vertical-navbox,
+.wiki .side-box-right,
+.wiki .quotebox {
+  float: right;
+  clear: right;
+  width: 22em;
+  max-width: 100%;
+  margin: 0.3em 0 1em 1.4em;
+  border: 1px solid #a2a9b1;
+  background: #f8f9fa;
+  font-size: 0.88em;
+  line-height: 1.5;
+  border-spacing: 3px;
+  padding: 0.2em;
+  color: #202122;
+}
+.wiki .infobox th,
+.wiki .infobox td,
+.wiki .sidebar th,
+.wiki .sidebar td {
+  padding: 0.2em 0.4em;
+  vertical-align: top;
+  text-align: left;
+}
+.wiki .infobox-above,
+.wiki .infobox-title,
+.wiki .infobox caption,
+.wiki .sidebar-title {
+  font-size: 1.25em;
+  font-weight: 700;
+  text-align: center !important;
+  padding: 0.3em;
+}
+.wiki .infobox-image,
+.wiki .infobox-full-data,
+.wiki .infobox-subheader,
+.wiki .infobox-caption {
+  text-align: center !important;
+}
+.wiki .infobox-caption {
+  font-size: 0.92em;
+  color: #54595d;
+}
+.wiki .infobox-header,
+.wiki .infobox-subheader {
+  background: #eaecf0;
+  text-align: center !important;
+}
+.wiki .infobox-label {
+  font-weight: 700;
+}
+
+/* images & figures */
+.wiki figure {
+  margin: 0;
+}
+.wiki figure[typeof~='mw:File/Thumb'],
+.wiki figure[typeof~='mw:File/Frame'],
+.wiki .thumb.tright,
+.wiki .tright {
+  float: right;
+  clear: right;
+  margin: 0.4em 0 1.2em 1.4em;
+}
+.wiki figure.mw-halign-left,
+.wiki .thumb.tleft,
+.wiki .tleft {
+  float: left;
+  clear: left;
+  margin: 0.4em 1.4em 1.2em 0;
+}
+.wiki figure.mw-halign-center,
+.wiki .center {
+  float: none;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+  display: table;
+}
+.wiki figure.mw-halign-none {
+  float: none;
+  margin: 0.5em 0;
+}
+.wiki figure[typeof~='mw:File/Thumb'],
+.wiki figure[typeof~='mw:File/Frame'],
+.wiki .thumbinner {
+  border: 1px solid #c8ccd1;
+  background: #f8f9fa;
+  padding: 3px;
+  max-width: 100%;
+}
+.wiki figure > a,
+.wiki figure > span {
+  display: block;
+}
+.wiki figcaption,
+.wiki .thumbcaption {
+  font-size: 0.85em;
+  line-height: 1.45;
+  padding: 0.4em 0.3em 0.2em;
+  color: #202122;
+}
+.wiki .gallery {
+  list-style: none;
+  margin: 0.5em 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wiki .gallerybox {
+  display: inline-block;
+  vertical-align: top;
+  width: auto !important;
+  background: #f8f9fa;
+  border: 1px solid #eaecf0;
+  padding: 4px;
+}
+.wiki .gallerytext {
+  font-size: 0.8em;
+}
+.wiki .tmulti .trow,
+.wiki .multiimageinner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+/* tables */
+.wiki table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+.wiki .wikitable {
+  display: block;
+  overflow-x: auto;
+  margin: 1em 0;
+  background: #f8f9fa;
+  border: 1px solid #a2a9b1;
+  font-size: 0.92em;
+}
+.wiki .wikitable > tbody > tr > th,
+.wiki .wikitable > tbody > tr > td,
+.wiki .wikitable > thead > tr > th,
+.wiki .wikitable > tr > th,
+.wiki .wikitable > tr > td {
+  border: 1px solid #a2a9b1;
+  padding: 0.25em 0.5em;
+}
+.wiki .wikitable th {
+  background: #eaecf0;
+  text-align: center;
+}
+.wiki .wikitable caption {
+  font-weight: 700;
+  padding: 0.3em;
+}
+
+/* navboxes */
+.wiki .navbox {
+  clear: both;
+  width: 100%;
+  margin-top: 1em;
+  border: 1px solid #a2a9b1;
+  padding: 1px;
+  font-size: 0.86em;
+  text-align: center;
+  background: #fdfdfd;
+}
+.wiki .navbox + .navbox,
+.wiki .navbox-styles + .navbox {
+  margin-top: -1px;
+}
+.wiki .navbox-inner,
+.wiki .navbox-subgroup {
+  width: 100%;
+}
+.wiki .navbox th,
+.wiki .navbox-title,
+.wiki .navbox-abovebelow {
+  background: #ccccff;
+  padding: 0.25em 1em;
+}
+.wiki .navbox-title {
+  font-weight: 700;
+}
+.wiki .navbox-group {
+  background: #ddddff;
+  text-align: right;
+  white-space: nowrap;
+  padding: 0.25em 1em;
+  font-weight: 700;
+  width: 1%;
+}
+.wiki .navbox-list {
+  text-align: left;
+  padding: 0.25em 0.5em;
+  border-left: 2px solid #fdfdfd;
+  width: 100%;
+}
+.wiki .navbox-even {
+  background: #f7f7f7;
+}
+.wiki .navbox-odd {
+  background: transparent;
+}
+.wiki .navbox .navbox-image {
+  padding-left: 0.5em;
+}
+.wiki .hlist ul,
+.wiki .hlist ol,
+.wiki .hlist dl {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+.wiki .hlist li,
+.wiki .hlist dd,
+.wiki .hlist dt {
+  display: inline;
+  margin: 0;
+}
+.wiki .hlist li:not(:last-child)::after,
+.wiki .hlist dd:not(:last-child)::after {
+  content: ' · ';
+  font-weight: 700;
+}
+.wiki .hlist li > ul::before,
+.wiki .hlist li > ol::before {
+  content: ' (';
+}
+.wiki .hlist li > ul::after,
+.wiki .hlist li > ol::after {
+  content: ') ';
+}
+
+/* references */
+.wiki .reflist,
+.wiki .references,
+.wiki .refbegin {
+  font-size: 0.86em;
+}
+.wiki .reflist-columns,
+.wiki .refbegin-columns {
+  column-width: 28em;
+}
+.wiki ol.references {
+  margin-left: 2em;
+}
+.wiki .mw-cite-backlink {
+  font-weight: 700;
+}
+.wiki cite {
+  font-style: normal;
+}
+.wiki .citation q {
+  quotes: '"' '"';
+}
+
+/* misc templates */
+.wiki .mbox-small,
+.wiki .side-box,
+.wiki .portalbox,
+.wiki .sistersitebox {
+  float: right;
+  clear: right;
+  width: 20em;
+  max-width: 100%;
+  margin: 0.5em 0 1em 1em;
+  border: 1px solid #a2a9b1;
+  background: #f8f9fa;
+  padding: 0.3em 0.6em;
+  font-size: 0.86em;
+}
+.wiki .ombox,
+.wiki .tmbox,
+.wiki .cmbox,
+.wiki .fmbox {
+  margin: 0.5em 0;
+  border: 1px solid #a2a9b1;
+  background: #f8f9fa;
+  padding: 0.3em;
+}
+.wiki .mw-collapsible-toggle,
+.wiki .mw-collapsible-text {
+  display: none;
+}
+.wiki .toc,
+.wiki #toc {
+  display: none;
+}
+.wiki .nowrap {
+  white-space: nowrap;
+}
+.wiki .plainlist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wiki .mw-empty-elt {
+  display: none;
+}
+.wiki .clear {
+  clear: both;
+}
+.wiki pre,
+.wiki code {
+  background: #f8f9fa;
+  border: 1px solid #eaecf0;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 0.9em;
+}
+.wiki pre {
+  padding: 1em;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+.wiki .mwe-math-fallback-image-inline,
+.wiki .mwe-math-fallback-image-display {
+  vertical-align: middle;
+  display: inline-block;
+}
+.wiki .mwe-math-mathml-a11y {
+  display: none;
+}
+[dir='rtl'] .wiki .infobox,
+[dir='rtl'] .wiki .sidebar,
+[dir='rtl'] .wiki figure[typeof~='mw:File/Thumb'],
+[dir='rtl'] .wiki .tright {
+  float: left;
+  clear: left;
+  margin: 0.3em 1.4em 1em 0;
+}
+[dir='rtl'] .wiki .hatnote {
+  padding-left: 0;
+  padding-right: 1.6em;
+}
+
+@media (max-width: 720px) {
+  .paper {
+    border-radius: 14px;
+    font-size: 15.5px;
+  }
+  .wiki .infobox,
+  .wiki .sidebar,
+  .wiki .vertical-navbox,
+  .wiki .quotebox,
+  .wiki .side-box,
+  .wiki .portalbox,
+  .wiki .mbox-small,
+  .wiki figure[typeof~='mw:File/Thumb'],
+  .wiki figure[typeof~='mw:File/Frame'],
+  .wiki .tright,
+  .wiki .tleft,
+  [dir='rtl'] .wiki .infobox,
+  [dir='rtl'] .wiki figure[typeof~='mw:File/Thumb'] {
+    float: none;
+    width: auto !important;
+    margin: 1em auto;
+    display: table;
+  }
+  .wiki .navbox-group {
+    white-space: normal;
+  }
+}
