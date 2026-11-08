@@ -6,7 +6,7 @@ import { ticketSecret, type Env } from './env';
 import { requirePlayer } from './players';
 import { DEFAULT_SETTINGS, identityOf, sanitizeSettings, type Identity } from './roomSettings';
 import { HttpError, isRoomCode, randomRoomCode, readJson, signToken, verifyToken } from './util';
-import { clientPage, getLinks, getPage, type FullPage } from './wiki';
+import { canonicalTitle, getLinks } from './wiki';
 
 interface Ticket extends Identity {
   room: string;
@@ -73,7 +73,7 @@ export async function roomSocket(req: Request, env: Env, rawCode: string): Promi
   return roomStub(env, code).fetch(new Request(req.url, { headers }));
 }
 
-export async function roomMove(req: Request, env: Env, rawCode: string): Promise<RoomMoveResponse> {
+export async function roomMove(req: Request, env: Env, rawCode: string, waitUntil: (p: Promise<unknown>) => void = () => {}): Promise<RoomMoveResponse> {
   const code = checkCode(rawCode);
   const t = await readTicket(env, req.headers.get('X-Ticket'), code);
   const body = await readJson<{ lang?: string; from?: string; to?: string; back?: boolean }>(req);
@@ -81,17 +81,19 @@ export async function roomMove(req: Request, env: Env, rawCode: string): Promise
   const from = normalizeTitle(body.from ?? '');
   const to = normalizeTitle(body.to ?? '');
   if (!from || !to) throw new HttpError(400, 'Missing page');
-  let page: FullPage;
-  if (body.back) {
-    page = await getPage(body.lang, to);
-  } else {
+  let dest = to;
+  if (!body.back) {
     const { links } = await getLinks(body.lang, from);
     if (!links.has(to)) throw new HttpError(400, `"${to}" is not linked from "${from}".`, 'invalid_move');
-    page = await getPage(body.lang, to);
+    const resolved = await canonicalTitle(body.lang, to);
+    if (!resolved) throw new HttpError(404, `"${to}" does not exist on Wikipedia any more.`, 'missing_page');
+    if (resolved === from) throw new HttpError(400, 'That link just leads back to this page. No click counted.', 'same_page');
+    dest = resolved;
   }
-  const res = await roomStub(env, code).commitMove(t.pid, { lang: body.lang, from, to: page.title, back: !!body.back });
+  const res = await roomStub(env, code).commitMove(t.pid, { lang: body.lang, from, to: dest, back: !!body.back });
   if (!res.ok) throw new HttpError(409, res.message, res.code, { current: res.current ?? null });
-  return { ok: true, page: clientPage(page), progress: res.progress, finished: res.finished };
+  if (!res.finished) waitUntil(getLinks(body.lang, dest).catch(() => {}));
+  return { ok: true, title: dest, progress: res.progress, finished: res.finished };
 }
 
 export async function matchmakingTicket(req: Request, env: Env) {

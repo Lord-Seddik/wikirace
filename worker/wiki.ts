@@ -1,24 +1,17 @@
 /**
- * Everything that talks to Wikipedia.
+ * Everything the server asks Wikipedia.
  *
- * Articles are fetched with the Action API (`action=parse`), which returns the rendered
- * HTML *and* the list of article links on the page in one request. The HTML is rewritten
- * so that only real article links stay clickable (as `data-to="Title"`), and the link list
- * is cached separately: it is what the server uses to check that every move in a race is a
- * link that really exists on the page the player was on.
- *
- * Caching: a small in-memory LRU per isolate, then the Cloudflare Cache API (per colo),
- * then Wikipedia itself (with Cloudflare edge caching of the subrequest).
+ * The browser downloads and renders articles itself (straight from Wikipedia). The server
+ * only needs two light things to referee a race:
+ *   - the list of article links on a page (to check a click is a real link), and
+ *   - the canonical title of the page a link leads to (redirects resolved).
+ * Both are small JSON responses, cached in memory, in the Cloudflare Cache API and at the edge.
  */
-import { normalizeTitle, titleFromHref, wikiUrl } from '../shared/titles';
-import type { PageData, PageSummary, SearchHit } from '../shared/types';
+import { normalizeTitle } from '../shared/titles';
+import type { PageSummary, SearchHit } from '../shared/types';
 import { HttpError } from './util';
 
-const UA = 'WikiRaceGame/1.0 (https://wikirace.seddikbachounda.com; game that renders Wikipedia articles)';
-
-export interface FullPage extends PageData {
-  links: string[];
-}
+const UA = 'WikiRaceGame/1.0 (https://wikirace.seddikbachounda.com; Wikipedia racing game)';
 
 interface LinkSet {
   title: string;
@@ -43,9 +36,9 @@ class LRU<V> {
   }
 }
 
-const pageMem = new LRU<FullPage>(16);
-const linkMem = new LRU<LinkSet>(400);
-const inflight = new Map<string, Promise<FullPage>>();
+const linkMem = new LRU<LinkSet>(150);
+const titleMem = new LRU<string | null>(2000);
+const linkInflight = new Map<string, Promise<LinkSet>>();
 
 let cacheOrigin = 'https://wikirace.seddikbachounda.com';
 export function setCacheOrigin(origin: string) {
@@ -53,7 +46,7 @@ export function setCacheOrigin(origin: string) {
 }
 
 function cacheKey(kind: string, lang: string, title: string): Request {
-  return new Request(`${cacheOrigin}/__cache/v2/${kind}/${lang}/${encodeURIComponent(title)}`);
+  return new Request(`${cacheOrigin}/__cache/v3/${kind}/${lang}/${encodeURIComponent(title)}`);
 }
 
 async function cacheGet<T>(kind: string, lang: string, title: string): Promise<T | null> {
@@ -84,209 +77,92 @@ function apiUrl(lang: string, params: Record<string, string>): string {
   return u.toString();
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** GET JSON from Wikimedia, with one retry when Wikipedia is busy (429/5xx) or unreachable. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function wikiJson(url: string, edgeTtl?: number): Promise<any> {
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { 'User-Agent': UA, 'Api-User-Agent': UA, Accept: 'application/json' },
-      ...(edgeTtl ? { cf: { cacheTtl: edgeTtl, cacheEverything: true } } : {}),
-    });
-  } catch {
-    throw new HttpError(502, 'Could not reach Wikipedia. Try again in a moment.');
-  }
-  if (res.status === 404) throw new HttpError(404, 'That page does not exist on Wikipedia.');
-  if (!res.ok) throw new HttpError(502, `Wikipedia answered with an error (${res.status}).`);
-  return res.json();
-}
-
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" };
-function textOf(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) => {
-      if (e[0] === '#') {
-        const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+  for (let attempt = 0; ; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(url, {
+        headers: { 'User-Agent': UA, 'Api-User-Agent': UA, Accept: 'application/json' },
+        ...(edgeTtl ? { cf: { cacheTtl: edgeTtl, cacheEverything: true } } : {}),
+      });
+    } catch {
+      res = null;
+    }
+    if (res?.ok) {
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        /* rate-limit pages come back as plain text */
       }
-      return ENTITIES[e.toLowerCase()] ?? m;
-    })
-    .trim();
-}
-
-function absolutize(u: string, lang: string): string {
-  if (u.startsWith('//')) return `https:${u}`;
-  if (u.startsWith('/')) return `https://${lang}.wikipedia.org${u}`;
-  return u;
-}
-
-const REMOVE_SELECTORS = [
-  'script', 'link', 'meta', 'noscript', 'iframe', 'object', 'embed', 'form', 'input', 'button',
-  'textarea', 'select', 'video', 'audio', 'source', 'track',
-  '.mw-editsection', '.mw-empty-elt', '.navbar', '.mw-jump-link', '.noprint', '.ambox', '.mw-indicators',
-];
-
-/** Rewrites parser HTML: keep valid article links as data-to, neuter everything else. */
-async function sanitize(html: string, links: Set<string>, lang: string): Promise<string> {
-  let rw = new HTMLRewriter();
-  for (const sel of REMOVE_SELECTORS) rw = rw.on(sel, { element: (el) => void el.remove() });
-  rw = rw
-    .on('*', {
-      element(el) {
-        const drop: string[] = [];
-        for (const [name, value] of el.attributes) {
-          if (/^on/i.test(name) || /^\s*javascript:/i.test(value)) drop.push(name);
-        }
-        for (const n of drop) el.removeAttribute(n);
-      },
-    })
-    .on('a', {
-      element(el) {
-        const href = el.getAttribute('href');
-        el.removeAttribute('target');
-        if (href == null) return;
-        el.removeAttribute('href');
-        if (href.startsWith('#')) {
-          el.setAttribute('data-anchor', href.slice(1));
-          return;
-        }
-        const t = titleFromHref(href);
-        if (t && links.has(t)) el.setAttribute('data-to', t);
-        else el.setAttribute('data-dead', '');
-      },
-    })
-    .on('area', { element: (el) => void el.removeAttribute('href') })
-    .on('img', {
-      element(el) {
-        const src = el.getAttribute('src');
-        if (src) el.setAttribute('src', absolutize(src, lang));
-        const srcset = el.getAttribute('srcset');
-        if (srcset) {
-          el.setAttribute(
-            'srcset',
-            srcset
-              .split(',')
-              .map((part) => {
-                const [u, ...rest] = part.trim().split(/\s+/);
-                return [absolutize(u, lang), ...rest].join(' ');
-              })
-              .join(', '),
-          );
-        }
-        el.setAttribute('loading', 'lazy');
-        el.setAttribute('decoding', 'async');
-      },
-    });
-  return rw.transform(new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })).text();
+    } else if (res?.status === 404) {
+      throw new HttpError(404, 'That page does not exist on Wikipedia.');
+    }
+    if (attempt >= 1) throw new HttpError(503, 'Wikipedia is busy right now. Try that click again in a second.', 'wiki_busy');
+    await sleep(400);
+  }
 }
 
 function rememberLinks(lang: string, keys: string[], set: LinkSet) {
   for (const k of keys) linkMem.set(`${lang}:${k}`, set);
 }
 
-/** Full article: sanitized HTML + link list. Follows redirects; `title` is canonical. */
-export async function getPage(lang: string, rawTitle: string): Promise<FullPage> {
+/** Article links of a page (used to validate moves). Follows redirects; `title` is canonical. */
+export async function getLinks(lang: string, rawTitle: string): Promise<LinkSet> {
   const norm = normalizeTitle(rawTitle);
-  if (!norm) throw new HttpError(400, 'Missing page title');
-  const memKey = `${lang}:${norm}`;
-  const mem = pageMem.get(memKey);
+  const key = `${lang}:${norm}`;
+  const mem = linkMem.get(key);
   if (mem) return mem;
-  const running = inflight.get(memKey);
+  const running = linkInflight.get(key);
   if (running) return running;
-
   const job = (async () => {
-    const cached = await cacheGet<FullPage>('page', lang, norm);
+    const cached = await cacheGet<{ title: string; links: string[] }>('links', lang, norm);
     if (cached) {
-      pageMem.set(memKey, cached);
-      rememberLinks(lang, [norm, cached.title], { title: cached.title, links: new Set(cached.links) });
-      return cached;
+      const set = { title: cached.title, links: new Set(cached.links) };
+      rememberLinks(lang, [norm, cached.title], set);
+      return set;
     }
-    const data = await wikiJson(
-      apiUrl(lang, {
-        action: 'parse',
-        page: norm,
-        prop: 'text|links|displaytitle',
-        redirects: '1',
-        disableeditsection: '1',
-        disabletoc: '1',
-        disablelimitreport: '1',
-      }),
-      900,
-    );
-    if (data.error) {
-      if (data.error.code === 'missingtitle' || data.error.code === 'invalidtitle') {
-        throw new HttpError(404, `There is no Wikipedia article called "${norm}".`, 'missing_page');
-      }
-      throw new HttpError(502, data.error.info ?? 'Wikipedia error');
-    }
-    const p = data.parse;
-    if (!p || p.ns !== undefined && p.ns !== 0) throw new HttpError(400, 'Only encyclopedia articles can be used.');
-    const title = normalizeTitle(p.title);
-    const links: string[] = [
+    const data = await wikiJson(apiUrl(lang, { action: 'parse', page: norm, prop: 'links', redirects: '1' }), 3600);
+    if (data.error || !data.parse) throw new HttpError(404, `There is no Wikipedia article called "${norm}".`, 'missing_page');
+    const title = normalizeTitle(data.parse.title);
+    const links = [
       ...new Set(
-        ((p.links ?? []) as { ns: number; title: string; exists?: boolean }[])
+        ((data.parse.links ?? []) as { ns: number; title: string; exists?: boolean }[])
           .filter((l) => l.ns === 0 && l.exists)
           .map((l) => normalizeTitle(l.title)),
       ),
     ];
-    const linkSet = new Set(links);
-    const html = await sanitize(String(p.text ?? ''), linkSet, lang);
-    const page: FullPage = {
-      lang,
-      title,
-      displayTitle: textOf(String(p.displaytitle ?? title)) || title,
-      html,
-      url: wikiUrl(lang, title),
-      links,
-    };
-    pageMem.set(memKey, page);
-    pageMem.set(`${lang}:${title}`, page);
-    rememberLinks(lang, [norm, title], { title, links: linkSet });
-    const puts = [cachePut('page', lang, title, page, 6 * 3600), cachePut('links', lang, title, { title, links }, 24 * 3600)];
-    if (norm !== title) {
-      puts.push(cachePut('page', lang, norm, page, 6 * 3600), cachePut('links', lang, norm, { title, links }, 24 * 3600));
-    }
+    const set = { title, links: new Set(links) };
+    rememberLinks(lang, [norm, title], set);
+    titleMem.set(key, title);
+    const puts = [cachePut('links', lang, title, { title, links }, 24 * 3600)];
+    if (norm !== title) puts.push(cachePut('links', lang, norm, { title, links }, 24 * 3600));
     await Promise.all(puts);
-    return page;
+    return set;
   })();
-  inflight.set(memKey, job);
+  linkInflight.set(key, job);
   try {
     return await job;
   } finally {
-    inflight.delete(memKey);
+    linkInflight.delete(key);
   }
 }
 
-export function clientPage(p: FullPage): PageData {
-  return { lang: p.lang, title: p.title, displayTitle: p.displayTitle, html: p.html, url: p.url };
-}
-
-/** Article links of a page (used to validate moves). Lighter than getPage on a cache miss. */
-export async function getLinks(lang: string, rawTitle: string): Promise<LinkSet> {
+/** Where a link leads: the canonical article title (redirects followed), or null if missing. */
+export async function canonicalTitle(lang: string, rawTitle: string): Promise<string | null> {
   const norm = normalizeTitle(rawTitle);
-  const mem = linkMem.get(`${lang}:${norm}`);
-  if (mem) return mem;
-  const cached = await cacheGet<{ title: string; links: string[] }>('links', lang, norm);
-  if (cached) {
-    const set = { title: cached.title, links: new Set(cached.links) };
-    rememberLinks(lang, [norm, cached.title], set);
-    return set;
-  }
-  const data = await wikiJson(apiUrl(lang, { action: 'parse', page: norm, prop: 'links', redirects: '1' }), 900);
-  if (data.error) throw new HttpError(404, `There is no Wikipedia article called "${norm}".`, 'missing_page');
-  const title = normalizeTitle(data.parse.title);
-  const links = [
-    ...new Set(
-      ((data.parse.links ?? []) as { ns: number; title: string; exists?: boolean }[])
-        .filter((l) => l.ns === 0 && l.exists)
-        .map((l) => normalizeTitle(l.title)),
-    ),
-  ];
-  const set = { title, links: new Set(links) };
-  rememberLinks(lang, [norm, title], set);
-  await cachePut('links', lang, title, { title, links }, 24 * 3600);
-  if (norm !== title) await cachePut('links', lang, norm, { title, links }, 24 * 3600);
-  return set;
+  const key = `${lang}:${norm}`;
+  const known = titleMem.get(key);
+  if (known !== undefined) return known;
+  const mem = linkMem.get(key);
+  if (mem) return mem.title;
+  const resolved = (await resolveTitles(lang, [norm])).get(norm) ?? null;
+  titleMem.set(key, resolved);
+  return resolved;
 }
 
 /**
@@ -381,6 +257,26 @@ export async function randomArticle(lang: string, rng: () => number = Math.rando
   const good = pages.filter((p) => (p.length ?? 0) > 9000);
   const pool = good.length ? good : pages.slice(0, 3);
   return normalizeTitle(pool[Math.floor(rng() * pool.length)].title);
+}
+
+function absolutize(u: string, lang: string): string {
+  if (u.startsWith('//')) return `https:${u}`;
+  if (u.startsWith('/')) return `https://${lang}.wikipedia.org${u}`;
+  return u;
+}
+
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" };
+function textOf(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e: string) => {
+      if (e[0] === '#') {
+        const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      }
+      return ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .trim();
 }
 
 const MAIN_PAGES = new Set([

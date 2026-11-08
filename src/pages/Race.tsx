@@ -6,7 +6,8 @@ import { Article, PathList, RaceHud, RaceTimer } from '../components/race';
 import { Button, ErrorBox, LinkButton, Modal, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
 import { confetti, plural, sfx, syncClock, toast, useTitle } from '../lib/misc';
-import { fetchPage, runCache, startRace } from '../lib/races';
+import { runCache, startRace } from '../lib/races';
+import { loadArticle } from '../lib/wiki';
 import { navigate } from '../lib/router';
 import { refreshMe, useMe } from '../lib/session';
 
@@ -14,8 +15,10 @@ export function RacePage({ id }: { id: string }) {
   const me = useMe();
   const cached = runCache.get(id);
   const [run, setRun] = useState<RunView | null>(cached?.run ?? null);
-  const [page, setPage] = useState<PageData | null>(cached?.page ?? null);
+  const [page, setPage] = useState<PageData | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [opening, setOpening] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [gaveUp, setGaveUp] = useState<{ bestKnown: BestKnown | null } | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -26,18 +29,28 @@ export function RacePage({ id }: { id: string }) {
     if (cached?.resumed) toast('Welcome back! Your clock kept running.', 'info');
     runCache.delete(id);
     if (cached) return;
-    api<{ run: RunView; page: PageData | null; serverNow: number }>(`/api/runs/${id}`)
+    api<{ run: RunView; serverNow: number }>(`/api/runs/${id}`)
       .then((r) => {
         syncClock(r.serverNow);
-        if (r.run.status !== 'active' || !r.page || (me && r.run.playerId !== me.id)) navigate(`/run/${id}`, { replace: true });
-        else {
-          setRun(r.run);
-          setPage(r.page);
-        }
+        if (r.run.status !== 'active' || (me && r.run.playerId !== me.id)) navigate(`/run/${id}`, { replace: true });
+        else setRun(r.run);
       })
       .catch(setError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Show the page the server says we are on.
+  const current = run ? run.stack[run.stack.length - 1] : null;
+  const showCurrent = (title: string, lang: string) => {
+    setPageError(null);
+    loadArticle(lang, title)
+      .then(setPage)
+      .catch((e) => setPageError((e as Error).message));
+  };
+  useEffect(() => {
+    if (run && current && page?.title !== current && !busy) showCurrent(current, run.lang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, run?.lang]);
 
   // Warn before leaving mid-race.
   useEffect(() => {
@@ -50,17 +63,26 @@ export function RacePage({ id }: { id: string }) {
   if (error) return <ErrorBox error={error} onRetry={() => location.reload()} />;
   if (!run) return <Spinner label="Loading race…" />;
 
-  const current = run.stack[run.stack.length - 1];
-
   const move = async (to: string, back = false) => {
-    if (busy || run.status !== 'active') return;
+    if (busy || run.status !== 'active' || !current) return;
     setBusy(true);
+    setOpening(to);
     sfx.click();
+    // Download the article while the server checks the click.
+    const article = loadArticle(run.lang, to);
+    article.catch(() => {});
     try {
       const res = await api<MoveResponse>(`/api/runs/${id}/move`, { body: { from: current, to, back } });
       syncClock(res.serverNow);
+      try {
+        let next = await article;
+        if (next.title !== res.title) next = await loadArticle(run.lang, res.title);
+        setPage(next);
+        setPageError(null);
+      } catch (e) {
+        setPageError((e as Error).message);
+      }
       setRun(res.run);
-      setPage(res.page);
       if (res.result) {
         setResult(res.result);
         sfx.win();
@@ -73,11 +95,12 @@ export function RacePage({ id }: { id: string }) {
         const fresh = e.data.run as RunView;
         setRun(fresh);
         if (fresh.status !== 'active') navigate(`/run/${id}`, { replace: true });
-        else setPage(await fetchPage(fresh.lang, fresh.stack[fresh.stack.length - 1]));
+        else showCurrent(fresh.stack[fresh.stack.length - 1], fresh.lang);
       }
       toast((e as Error).message, 'bad');
     } finally {
       setBusy(false);
+      setOpening(null);
     }
   };
 
@@ -116,7 +139,15 @@ export function RacePage({ id }: { id: string }) {
         timer={<RaceTimer startedAt={run.startedAt} finishedAt={run.status === 'active' ? null : (run.finishedAt ?? Date.now())} />}
       />
       <div className="race-body">
-        <Article page={page} loading={busy} onNavigate={(t) => move(t)} disabled={run.status !== 'active'} />
+        <Article
+          page={page}
+          loading={busy}
+          opening={opening}
+          error={pageError}
+          onRetry={() => current && showCurrent(current, run.lang)}
+          onNavigate={(t) => move(t)}
+          disabled={run.status !== 'active'}
+        />
       </div>
 
       <Modal open={confirmQuit} onClose={() => setConfirmQuit(false)} title="Give up?">

@@ -4,7 +4,7 @@ import { Article, PageCard, RaceHud, RaceTimer } from '../components/race';
 import { Button, Card, Empty, LinkButton, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
 import { confetti, copyText, formatDuration, ordinal, plural, sfx, toast, useNow, useTitle } from '../lib/misc';
-import { fetchPage } from '../lib/races';
+import { loadArticle } from '../lib/wiki';
 import { Link } from '../lib/router';
 import { useRoom, type Emote } from '../lib/useRoom';
 import { FEATURES } from '../lib/features';
@@ -125,6 +125,8 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
   const [page, setPage] = useState<PageData | null>(null);
   const [local, setLocal] = useState<Local | null>(null);
   const [busy, setBusy] = useState(false);
+  const [opening, setOpening] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [watch, setWatch] = useState<string | null>(null);
   const [watchPage, setWatchPage] = useState<PageData | null>(null);
   const [sideOpen, setSideOpen] = useState(false);
@@ -143,9 +145,10 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
     let cancelled = false;
     const target = me.current;
     setLocal({ clicks: me.clicks ?? 0, current: target, stack: me.stack ?? [target], path: me.path ?? [target] });
-    fetchPage(lang, target)
+    setPageError(null);
+    loadArticle(lang, target)
       .then((p) => !cancelled && setPage(p))
-      .catch((e) => toast(e.message, 'bad'));
+      .catch((e) => !cancelled && setPageError((e as Error).message));
     return () => {
       cancelled = true;
     };
@@ -172,30 +175,44 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
     if (participant && !done) return;
     if (!watched?.current) return;
     let cancelled = false;
-    fetchPage(lang, watched.current).then((p) => !cancelled && setWatchPage(p));
+    loadArticle(lang, watched.current)
+      .then((p) => !cancelled && setWatchPage(p))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [watched?.current, participant, done, lang]);
 
   const move = async (to: string, back = false) => {
-    if (busy || !participant || done || counting || !page) return;
+    const from = local?.current ?? me?.current;
+    if (busy || !participant || done || counting || !from) return;
     setBusy(true);
+    setOpening(to);
     sfx.click();
+    const article = loadArticle(lang, to);
+    article.catch(() => {});
     try {
       const res = await api<RoomMoveResponse>(`/api/rooms/${room.code}/move`, {
-        body: { lang, from: page.title, to, back },
+        body: { lang, from, to, back },
         headers: { 'X-Ticket': ticket.current ?? '' },
         auth: false,
       });
-      setPage(res.page);
-      setLocal({ clicks: res.progress.clicks ?? 0, current: res.page.title, stack: res.progress.stack ?? [], path: res.progress.path ?? [] });
+      setLocal({ clicks: res.progress.clicks ?? 0, current: res.title, stack: res.progress.stack ?? [], path: res.progress.path ?? [] });
+      try {
+        let next = await article;
+        if (next.title !== res.title) next = await loadArticle(lang, res.title);
+        setPage(next);
+        setPageError(null);
+      } catch (e) {
+        setPageError((e as Error).message);
+      }
     } catch (e) {
       sfx.error();
       toast((e as Error).message, 'bad');
       if (e instanceof ApiError && e.code === 'desync') setLocal(null);
     } finally {
       setBusy(false);
+      setOpening(null);
     }
   };
 
@@ -251,7 +268,24 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
           )}
           {!participant && <div className="done-banner">👀 You are spectating. Click a racer to follow their screen. You'll join the next round.</div>}
           {participant && !done ? (
-            <Article page={page} loading={busy} onNavigate={(t) => move(t)} disabled={counting} banned={room.settings.banned} blurred={counting} />
+            <Article
+              page={page}
+              loading={busy}
+              opening={opening}
+              error={pageError}
+              onRetry={() => {
+                const t = local?.current ?? me?.current;
+                if (!t) return;
+                setPageError(null);
+                loadArticle(lang, t)
+                  .then(setPage)
+                  .catch((e) => setPageError((e as Error).message));
+              }}
+              onNavigate={(t) => move(t)}
+              disabled={counting}
+              banned={room.settings.banned}
+              blurred={counting}
+            />
           ) : watch && watchPage ? (
             <>
               <p className="watching-label">

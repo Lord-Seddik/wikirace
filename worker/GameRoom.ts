@@ -232,6 +232,7 @@ export class GameRoom extends DurableObject<Env> {
       prog.usedBack = true;
     } else {
       if (room.settings.banned.includes(m.to)) return { ok: false, code: 'banned', message: `"${m.to}" is banned in this room! Pick another link.` };
+      if (m.to === current) return { ok: false, code: 'same_page', message: 'That link just leads back to this page.' };
       prog.stack.push(m.to);
     }
     prog.path.push(m.to);

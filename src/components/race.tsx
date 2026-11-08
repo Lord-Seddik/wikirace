@@ -4,12 +4,21 @@ import { langInfo } from '../../shared/constants';
 import type { PageData, PageSummary } from '../../shared/types';
 import { api, qs } from '../lib/api';
 import { formatClock, formatDuration, serverNow, useAsync } from '../lib/misc';
+import { prefetchArticle } from '../lib/wiki';
 import { Button } from './ui';
 
 // ---------------------------------------------------------------- article
 
-const ArticleBody = memo(function ArticleBody({ html, onClick }: { html: string; onClick: (e: MouseEvent<HTMLDivElement>) => void }) {
-  return <div className="wiki mw-parser-output-host" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
+const ArticleBody = memo(function ArticleBody({
+  html,
+  onClick,
+  onOver,
+}: {
+  html: string;
+  onClick: (e: MouseEvent<HTMLDivElement>) => void;
+  onOver: (e: MouseEvent<HTMLDivElement>) => void;
+}) {
+  return <div className="wiki mw-parser-output-host" onClick={onClick} onMouseOver={onOver} dangerouslySetInnerHTML={{ __html: html }} />;
 });
 
 export function Article({
@@ -19,6 +28,9 @@ export function Article({
   disabled,
   banned = [],
   blurred,
+  opening,
+  error,
+  onRetry,
 }: {
   page: PageData | null;
   loading?: boolean;
@@ -26,12 +38,27 @@ export function Article({
   disabled?: boolean;
   banned?: string[];
   blurred?: boolean;
+  /** Title of the page being opened (shows a clear "Opening …" banner). */
+  opening?: string | null;
+  /** The article could not be loaded. */
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const nav = useRef(onNavigate);
   nav.current = onNavigate;
-  const state = useRef({ disabled, loading });
-  state.current = { disabled, loading };
+  const state = useRef({ disabled, loading, lang: page?.lang ?? 'en' });
+  state.current = { disabled, loading, lang: page?.lang ?? 'en' };
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Resting the pointer on a link starts downloading that article.
+  const onOver = useRef((e: MouseEvent<HTMLDivElement>) => {
+    const a = (e.target as HTMLElement).closest('a[data-to]');
+    clearTimeout(hoverTimer.current);
+    if (!a || state.current.disabled) return;
+    const to = a.getAttribute('data-to')!;
+    hoverTimer.current = setTimeout(() => prefetchArticle(state.current.lang, to), 150);
+  }).current;
 
   useEffect(() => {
     if (!page || !ref.current) return;
@@ -56,6 +83,14 @@ export function Article({
     }
   }).current;
 
+  if (error) {
+    return (
+      <article className="paper paper-error" ref={ref}>
+        <p>⚠️ {error}</p>
+        {onRetry && <Button onClick={onRetry}>Try again</Button>}
+      </article>
+    );
+  }
   if (!page) {
     return (
       <article className="paper paper-loading" ref={ref}>
@@ -76,10 +111,15 @@ export function Article({
       data-banned={banned.length ? banned.join('|') : undefined}
     >
       {loading && <div className="paper-progress" aria-hidden />}
+      {opening && (
+        <div className="opening" role="status">
+          <span className="spinner spinner-sm" aria-hidden /> Opening <b>{opening}</b>…
+        </div>
+      )}
       <h1 className="paper-title">{page.displayTitle}</h1>
       <p className="paper-sub">From Wikipedia, the free encyclopedia</p>
       <style>{banned.map((b) => `.wiki a[data-to="${CSS.escape(b)}"]{text-decoration:line-through;color:#b91c1c!important;cursor:not-allowed}`).join('')}</style>
-      <ArticleBody html={page.html} onClick={onClick} />
+      <ArticleBody html={page.html} onClick={onClick} onOver={onOver} />
       <footer className="paper-foot">
         Text from the Wikipedia article{' '}
         <a href={page.url} target="_blank" rel="noopener noreferrer">

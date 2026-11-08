@@ -100,14 +100,14 @@ export interface RunResult {
 
 export interface StartRunResponse {
   run: RunView;
-  page: PageData;
   serverNow: number;
   resumed: boolean;
 }
 
 export interface MoveResponse {
   run: RunView;
-  page: PageData;
+  /** Canonical title of the page you are now on (redirects resolved). */
+  title: string;
   result: RunResult | null;
   serverNow: number;
 }
@@ -335,7 +335,8 @@ export type ServerMessage =
 
 export interface RoomMoveResponse {
   ok: true;
-  page: PageData;
+  /** Canonical title of the page you are now on (redirects resolved). */
+  title: string;
   progress: PlayerProgress;
   finished: boolean;
 }

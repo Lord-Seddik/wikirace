@@ -12,7 +12,7 @@ import type { Env } from './env';
 import { generatePair } from './pairs';
 import { authPlayer, publicPlayer, requirePlayer, type PlayerRow, getPlayer } from './players';
 import { HttpError, addDays, randomId, readJson, utcDate } from './util';
-import { clientPage, getLinks, getPage, resolveTitles, type FullPage } from './wiki';
+import { canonicalTitle, getLinks, resolveTitles } from './wiki';
 
 export interface RunRow {
   id: string;
@@ -64,10 +64,8 @@ async function getRunRow(env: Env, id: string): Promise<RunRow | null> {
   return env.DB.prepare('SELECT * FROM runs WHERE id = ?').bind(id).first<RunRow>();
 }
 
-async function resume(env: Env, run: RunRow): Promise<StartRunResponse> {
-  const stack = JSON.parse(run.stack) as string[];
-  const page = await getPage(run.lang, stack[stack.length - 1]);
-  return { run: runView(run), page: clientPage(page), serverNow: Date.now(), resumed: true };
+async function resume(_env: Env, run: RunRow): Promise<StartRunResponse> {
+  return { run: runView(run), serverNow: Date.now(), resumed: true };
 }
 
 export async function startRun(req: Request, env: Env): Promise<StartRunResponse> {
@@ -128,7 +126,7 @@ export async function startRun(req: Request, env: Env): Promise<StartRunResponse
     throw new HttpError(400, 'Unknown race mode');
   }
 
-  const page = await getPage(lang, start);
+  const startTitle = (await canonicalTitle(lang, start)) ?? start;
   const id = randomId(12);
   const now = Date.now();
   try {
@@ -136,7 +134,7 @@ export async function startRun(req: Request, env: Env): Promise<StartRunResponse
       `INSERT INTO runs (id, player_id, mode, lang, start, target, difficulty, daily_date, challenge_id, ranked, started_at, clicks, path, stack, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active')`,
     )
-      .bind(id, me.id, body.mode, lang, page.title, target, difficulty, dailyDate, challengeId, ranked, now, JSON.stringify([page.title]), JSON.stringify([page.title]))
+      .bind(id, me.id, body.mode, lang, startTitle, target, difficulty, dailyDate, challengeId, ranked, now, JSON.stringify([startTitle]), JSON.stringify([startTitle]))
       .run();
   } catch (e) {
     // Two tabs racing to create the ranked attempt: hand back the one that won.
@@ -151,10 +149,10 @@ export async function startRun(req: Request, env: Env): Promise<StartRunResponse
     throw e;
   }
   const row = (await getRunRow(env, id))!;
-  return { run: runView(row), page: clientPage(page), serverNow: Date.now(), resumed: false };
+  return { run: runView(row), serverNow: Date.now(), resumed: false };
 }
 
-export async function moveRun(req: Request, env: Env, id: string): Promise<MoveResponse> {
+export async function moveRun(req: Request, env: Env, id: string, waitUntil: (p: Promise<unknown>) => void = () => {}): Promise<MoveResponse> {
   const me = await requirePlayer(req, env);
   const body = await readJson<{ from?: string; to?: string; back?: boolean }>(req);
   const run = await getRunRow(env, id);
@@ -169,25 +167,30 @@ export async function moveRun(req: Request, env: Env, id: string): Promise<MoveR
     throw new HttpError(409, 'Your race was out of sync, reloaded the current page.', 'desync', { run: runView(run) });
   }
 
-  let page: FullPage;
+  let dest: string;
   if (body.back) {
     if (stack.length < 2) throw new HttpError(400, 'Nothing to go back to.');
     stack.pop();
-    page = await getPage(run.lang, stack[stack.length - 1]);
+    dest = stack[stack.length - 1];
   } else {
     const to = normalizeTitle(body.to ?? '');
     if (!to) throw new HttpError(400, 'Missing link target');
     const { links } = await getLinks(run.lang, current);
     if (!links.has(to)) throw new HttpError(400, `"${to}" is not linked from "${current}".`, 'invalid_move');
-    page = await getPage(run.lang, to);
-    stack.push(page.title);
+    const resolved = await canonicalTitle(run.lang, to);
+    if (!resolved) throw new HttpError(404, `"${to}" does not exist on Wikipedia any more.`, 'missing_page');
+    if (resolved === current) throw new HttpError(400, 'That link just leads back to this page. No click counted.', 'same_page');
+    dest = resolved;
+    stack.push(dest);
   }
-  path.push(page.title);
+  path.push(dest);
+  // Have the next page's links ready before the player clicks again.
+  if (dest !== run.target) waitUntil(getLinks(run.lang, dest).catch(() => {}));
 
   const clicks = run.clicks + 1;
   const usedBack = run.used_back || body.back ? 1 : 0;
   const now = Date.now();
-  const finished = page.title === run.target;
+  const finished = dest === run.target;
   const durationMs = finished ? now - run.started_at : null;
   const upd = await env.DB.prepare(
     `UPDATE runs SET path = ?, stack = ?, clicks = ?, used_back = ?, status = ?, finished_at = ?, duration_ms = ?
@@ -210,7 +213,7 @@ export async function moveRun(req: Request, env: Env, id: string): Promise<MoveR
     duration_ms: durationMs,
   };
   const result = finished ? await finishRun(env, me, updated) : null;
-  return { run: runView(updated), page: clientPage(page), result, serverNow: Date.now() };
+  return { run: runView(updated), title: dest, result, serverNow: Date.now() };
 }
 
 async function bestKnown(env: Env, run: { lang: string; start: string; target: string }): Promise<BestKnown | null> {
@@ -314,15 +317,9 @@ export async function getRun(req: Request, env: Env, id: string) {
   const viewer = await authPlayer(req, env);
   const owner = viewer?.id === run.player_id;
   const player = await getPlayer(env, run.player_id);
-  let page = null;
-  if (owner && run.status === 'active') {
-    const stack = JSON.parse(run.stack) as string[];
-    page = clientPage(await getPage(run.lang, stack[stack.length - 1]));
-  }
   return {
     run: runView(run, { hidePath: run.status === 'active' && !owner }),
     player: player ? publicPlayer(player) : null,
-    page,
     bestKnown: run.status !== 'active' ? await bestKnown(env, run) : null,
     serverNow: Date.now(),
   };

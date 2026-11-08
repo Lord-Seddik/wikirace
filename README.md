@@ -29,7 +29,8 @@ One Cloudflare Worker serves everything:
 | --- | --- |
 | `src/` | React 19 single-page app (Vite 8), built to `dist/` and served as static assets |
 | `worker/index.ts` | API router (`/api/*`) |
-| `worker/wiki.ts` | Wikipedia Action API client: fetches articles (`action=parse`), rewrites the HTML so only real article links stay clickable, and caches pages and link lists (memory → Cache API → Wikipedia) |
+| `worker/wiki.ts` | Server-side Wikipedia client: small cached link lists and title lookups used to referee each click |
+| `src/lib/wiki.ts` | The browser loads articles straight from Wikipedia (`action=parse`, `origin=*`) and keeps only real article links clickable |
 | `worker/runs.ts` | Solo, daily and challenge races, validated move by move in D1 |
 | `worker/GameRoom.ts` | Durable Object per multiplayer room (WebSocket Hibernation API, one alarm drives all timers) |
 | `worker/Matchmaker.ts` | Durable Object holding the Quick Match queue |

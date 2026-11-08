@@ -11,7 +11,7 @@ import { authPlayer, createPlayer, meView, requirePlayer, touch, updateMe } from
 import { createRoom, matchmakingSocket, matchmakingTicket, roomInfo, roomMove, roomSocket, roomTicket, searchingCount } from './rooms';
 import { getRun, giveUpRun, moveRun, startRun } from './runs';
 import { HttpError, addDays, cleanText, errorResponse, json, utcDate } from './util';
-import { clientPage, getPage, getSummary, randomArticle, searchTitles, setCacheOrigin } from './wiki';
+import { getSummary, randomArticle, searchTitles, setCacheOrigin } from './wiki';
 
 export { GameRoom } from './GameRoom';
 export { Matchmaker } from './Matchmaker';
@@ -43,11 +43,6 @@ route('PATCH', '/api/me', async (req, env) => json(await updateMe(req, env, awai
 route('GET', '/api/players/([a-z0-9]{6,40})', async (_req, env, _ctx, [id]) => json(await profile(env, id)));
 
 // --- Wikipedia proxy
-route('GET', '/api/wiki/page', async (_req, _env, _ctx, _p, url) => {
-  const title = url.searchParams.get('title');
-  if (!title) throw new HttpError(400, 'Missing title');
-  return json(clientPage(await getPage(langParam(url), title)), 200, publicCache(3600));
-});
 route('GET', '/api/wiki/summary', async (_req, _env, _ctx, _p, url) => {
   const title = url.searchParams.get('title');
   if (!title) throw new HttpError(400, 'Missing title');
@@ -64,7 +59,7 @@ route('GET', '/api/wiki/random', async (_req, _env, _ctx, _p, url) => json({ tit
 route('GET', '/api/daily', async (req, env) => json(await dailyInfo(req, env)));
 route('POST', '/api/runs', async (req, env) => json(await startRun(req, env), 201));
 route('GET', '/api/runs/([a-z0-9]{12})', async (req, env, _ctx, [id]) => json(await getRun(req, env, id)));
-route('POST', '/api/runs/([a-z0-9]{12})/move', async (req, env, _ctx, [id]) => json(await moveRun(req, env, id)));
+route('POST', '/api/runs/([a-z0-9]{12})/move', async (req, env, ctx, [id]) => json(await moveRun(req, env, id, (p) => ctx.waitUntil(p))));
 route('POST', '/api/runs/([a-z0-9]{12})/giveup', async (req, env, _ctx, [id]) => json(await giveUpRun(req, env, id)));
 
 // --- leaderboards
@@ -87,7 +82,7 @@ route('POST', '/api/rooms', async (req, env) => json(await createRoom(req, env),
 route('GET', '/api/rooms/([A-Za-z0-9]{5})', async (_req, env, _ctx, [code]) => json(await roomInfo(env, code)));
 route('POST', '/api/rooms/([A-Za-z0-9]{5})/ticket', async (req, env, _ctx, [code]) => json(await roomTicket(req, env, code)));
 route('GET', '/api/rooms/([A-Za-z0-9]{5})/ws', async (req, env, _ctx, [code]) => roomSocket(req, env, code));
-route('POST', '/api/rooms/([A-Za-z0-9]{5})/move', async (req, env, _ctx, [code]) => json(await roomMove(req, env, code)));
+route('POST', '/api/rooms/([A-Za-z0-9]{5})/move', async (req, env, ctx, [code]) => json(await roomMove(req, env, code, (p) => ctx.waitUntil(p))));
 route('POST', '/api/matchmaking/ticket', async (req, env) => json(await matchmakingTicket(req, env)));
 route('GET', '/api/matchmaking/ws', async (req, env) => matchmakingSocket(req, env));
 route('GET', '/api/matches/([a-z0-9]{12})', async (_req, env, _ctx, [id]) => {
