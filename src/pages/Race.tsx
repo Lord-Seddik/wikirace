@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { dailyNumber } from '../../shared/constants';
 import type { BestKnown, MoveResponse, PageData, RunResult, RunView } from '../../shared/types';
 import { BestKnownPath, RunResultView, shareTextFor } from '../components/common';
-import { Article, PathList, RaceHud, RaceTimer } from '../components/race';
+import { Article, PathList, RaceHud, RaceTimer, RouteCard, useRacingMode } from '../components/race';
 import { Button, ErrorBox, LinkButton, Modal, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
 import { confetti, plural, sfx, syncClock, toast, useTitle } from '../lib/misc';
@@ -24,6 +24,7 @@ export function RacePage({ id }: { id: string }) {
   const [error, setError] = useState<Error | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
   useTitle(run ? `${run.start} → ${run.target}` : 'Race');
+  useRacingMode();
 
   useEffect(() => {
     if (cached?.resumed) toast('Welcome back! Your clock kept running.', 'info');
@@ -161,6 +162,7 @@ export function RacePage({ id }: { id: string }) {
       </Modal>
 
       <Modal open={!!result} onClose={() => setResult(null)} wide>
+        {result && <RouteCard lang={run.lang} start={run.start} target={run.target} size="sm" />}
         {result && (
           <RunResultView
             result={result}

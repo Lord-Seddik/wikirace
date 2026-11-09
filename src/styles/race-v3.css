@@ -1,0 +1,441 @@
+/* Pictures + full-screen race (loaded after app.css / wiki.css, so these win). */
+.hero h1 {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.hero h1 em {
+  font-style: normal;
+}
+.thumb {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-3);
+  color: #fff;
+  font-weight: 800;
+  line-height: 1;
+}
+.example-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 3px;
+}
+
+/* ---------------------------------------------------------------- route card */
+.route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.route-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: var(--surface-3);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  font: inherit;
+  color: #fff;
+  animation: appear 0.35s ease both;
+}
+.route-target {
+  animation-delay: 0.08s;
+}
+.route-tile img,
+.route-ph {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+.route-tile:hover img {
+  transform: scale(1.04);
+}
+.route-ph {
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.85);
+}
+.route-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.15) 55%, rgba(0, 0, 0, 0) 75%);
+}
+.route-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2125;
+}
+.route-target .route-label {
+  background: #22c55e;
+  color: #fff;
+}
+.route-name {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.route-name small {
+  font-weight: 500;
+  font-size: 0.78rem;
+  opacity: 0.85;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.route-arrow {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-weight: 800;
+  color: var(--accent);
+}
+.route-lg .route-name {
+  font-size: 1.4rem;
+}
+.route-sm {
+  margin-bottom: 14px;
+}
+.route-sm .route-tile {
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+}
+.route-sm .route-name {
+  font-size: 0.95rem;
+}
+.route-sm .route-name small {
+  display: none;
+}
+
+/* home: today's challenge as pictures */
+.today {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  text-align: left;
+}
+.today-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.today-head p {
+  margin: 0;
+}
+.today-btn {
+  align-self: center;
+}
+.countdown .route {
+  margin-top: 6px;
+}
+
+/* ---------------------------------------------------------------- racing */
+.main.main-bare {
+  padding: 0;
+}
+/* No site menu while racing: the article gets the screen. */
+body.racing {
+  --nav-h: 0px;
+}
+body.racing .nav {
+  display: none;
+}
+.hud {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.hud-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hud-home {
+  display: grid;
+  flex: none;
+}
+.hud-route {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+.hud-from {
+  flex: 0 1 auto;
+  max-width: 40%;
+}
+.hud-to {
+  flex: 0 1 auto;
+  cursor: pointer;
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+.hud-to:hover {
+  background: var(--surface-2);
+}
+.hud-page-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.hud-page-text small {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+.hud-to .hud-page-text small {
+  color: #16a34a;
+}
+.hud-page-text b {
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-arrow {
+  color: var(--faint);
+  flex: none;
+}
+.hud-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.hud-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.hud-stat b {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+.hud-stat small {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+.hud-time {
+  flex-direction: row;
+  gap: 6px;
+}
+.hud-time .timer {
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.hud-btn {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+.hud-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.hud-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.hud-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hud-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  overflow: hidden;
+}
+.hud-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--accent);
+  animation: progress 0.9s ease-in-out infinite;
+}
+.hud-peek {
+  top: calc(100% + 6px);
+}
+.race-body {
+  max-width: 1040px;
+  padding: 14px 14px 80px;
+}
+.race-body.with-side {
+  max-width: 1400px;
+}
+.race-side {
+  top: 72px;
+  max-height: calc(100vh - 90px);
+}
+
+/* the article */
+.paper {
+  border-radius: 14px;
+  box-shadow: none;
+  font-family: var(--font);
+  font-size: 16.5px;
+  line-height: 1.7;
+}
+.paper.is-loading .wiki {
+  opacity: 0.6;
+}
+.paper-title {
+  font-family: var(--font);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  border-bottom: 0;
+}
+.wiki h2 {
+  font-family: var(--font);
+  font-weight: 750;
+  font-size: 1.45em;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 720px) {
+  .hud {
+    padding: 6px 8px;
+  }
+  .hud-inner {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .hud-home {
+    display: none;
+  }
+  .hud-route {
+    order: 1;
+    flex-basis: 100%;
+  }
+  .hud-from {
+    max-width: 38%;
+  }
+  .hud-meta {
+    order: 2;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .hud-page {
+    padding: 3px 10px 3px 3px;
+  }
+  .hud-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .race-body,
+  .race-body.with-side {
+    padding: 0 0 80px;
+  }
+  .paper {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding: 18px 14px 28px;
+  }
+  .done-banner {
+    margin: 10px 10px 0;
+  }
+  .route {
+    gap: 6px;
+  }
+  .route-arrow {
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+  .route-name {
+    font-size: 0.98rem;
+    left: 9px;
+    right: 9px;
+  }
+  .route-lg .route-name {
+    font-size: 1.05rem;
+  }
+  .route-name small {
+    display: none;
+  }
+  .route-tile {
+    border-radius: 14px;
+    aspect-ratio: 1 / 1;
+  }
+  .route-sm .route-tile {
+    aspect-ratio: 4 / 3;
+  }
+}

@@ -5,6 +5,8 @@ import type { PageData, PageSummary } from '../../shared/types';
 import { api, qs } from '../lib/api';
 import { formatClock, formatDuration, serverNow, useAsync } from '../lib/misc';
 import { prefetchArticle } from '../lib/wiki';
+import { Link } from '../lib/router';
+import { Logo } from './common';
 import { Button } from './ui';
 
 // ---------------------------------------------------------------- article
@@ -149,7 +151,7 @@ export function RaceTimer({ startedAt, endsAt, finishedAt, compact }: { startedA
     const left = endsAt - t;
     return (
       <span className={`timer${left < 30_000 ? ' timer-danger' : ''}`} title="Time left">
-        {formatClock(Math.max(0, left))} left
+        {formatClock(Math.max(0, left))}
       </span>
     );
   }
@@ -192,6 +194,70 @@ export function PageCard({ lang, title, role, compact }: { lang: string; title: 
   );
 }
 
+// ---------------------------------------------------------------- pictures
+
+const TILE_COLORS = ['#3366cc', '#0f766e', '#7c3aed', '#c2410c', '#be123c', '#15803d', '#a16207', '#1d4ed8'];
+function tileColor(title: string) {
+  let h = 0;
+  for (const ch of title) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return TILE_COLORS[Math.abs(h) % TILE_COLORS.length];
+}
+
+/** Small round picture of an article (falls back to a colored initial). */
+export function PageThumb({ lang, title, size = 36 }: { lang: string; title: string; size?: number }) {
+  const { data } = useAsync(() => fetchSummary(lang, title), [lang, title]);
+  return data?.thumbnail ? (
+    <img className="thumb" src={data.thumbnail} alt="" style={{ width: size, height: size }} />
+  ) : (
+    <span className="thumb thumb-ph" style={{ width: size, height: size, background: tileColor(title), fontSize: size * 0.45 }} aria-hidden>
+      {title.charAt(0)}
+    </span>
+  );
+}
+
+function RouteTile({ lang, title, role, onClick }: { lang: string; title: string; role: 'start' | 'target'; onClick?: () => void }) {
+  const { data } = useAsync(() => fetchSummary(lang, title), [lang, title]);
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag className={`route-tile route-${role}`} onClick={onClick} type={onClick ? 'button' : undefined}>
+      {data?.thumbnail ? (
+        <img src={data.thumbnail} alt="" loading="lazy" />
+      ) : (
+        <span className="route-ph" style={{ background: tileColor(title) }} aria-hidden>
+          {title.charAt(0)}
+        </span>
+      )}
+      <span className="route-shade" aria-hidden />
+      <span className="route-label">{role === 'start' ? 'From' : 'To'}</span>
+      <span className="route-name">
+        {data?.displayTitle ?? title}
+        {data?.description && <small>{data.description}</small>}
+      </span>
+    </Tag>
+  );
+}
+
+/** The race at a glance: start picture → target picture. */
+export function RouteCard({ lang, start, target, size = 'md' }: { lang: string; start: string; target: string; size?: 'sm' | 'md' | 'lg' }) {
+  return (
+    <div className={`route route-${size}`}>
+      <RouteTile lang={lang} title={start} role="start" />
+      <span className="route-arrow" aria-hidden>
+        →
+      </span>
+      <RouteTile lang={lang} title={target} role="target" />
+    </div>
+  );
+}
+
+/** Hides the site menu while racing so the article gets the whole screen. */
+export function useRacingMode() {
+  useEffect(() => {
+    document.body.classList.add('racing');
+    return () => document.body.classList.remove('racing');
+  }, []);
+}
+
 // ---------------------------------------------------------------- HUD
 
 export function PathTrail({ path, target }: { path: string[]; target?: string }) {
@@ -215,7 +281,6 @@ export function RaceHud({
   start,
   target,
   clicks,
-  path,
   timer,
   canBack,
   onBack,
@@ -227,7 +292,7 @@ export function RaceHud({
   start: string;
   target: string;
   clicks: number;
-  path: string[];
+  path?: string[];
   timer: ReactNode;
   canBack?: boolean;
   onBack?: () => void;
@@ -238,39 +303,49 @@ export function RaceHud({
   const [peek, setPeek] = useState(false);
   return (
     <div className="hud">
-      <div className="hud-row">
+      <div className="hud-inner">
+        <Link to="/" className="hud-home" aria-label="WikiRace home">
+          <Logo size={28} />
+        </Link>
         <div className="hud-route">
-          <span className="hud-start" title="Start page">
-            {start}
+          <span className="hud-page hud-from" title={`Start: ${start}`}>
+            <PageThumb lang={lang} title={start} size={30} />
+            <span className="hud-page-text">
+              <small>From</small>
+              <b>{start}</b>
+            </span>
           </span>
           <span className="hud-arrow" aria-hidden>
             →
           </span>
-          <button className="hud-target" onClick={() => setPeek((p) => !p)} title="Show what the target is about" aria-expanded={peek}>
-            <span className="hud-target-label">Target</span> {target}
+          <button className="hud-page hud-to" onClick={() => setPeek((p) => !p)} aria-expanded={peek} title="What is the target?">
+            <PageThumb lang={lang} title={target} size={30} />
+            <span className="hud-page-text">
+              <small>To</small>
+              <b>{target}</b>
+            </span>
           </button>
         </div>
-        <div className="hud-stats">
-          <span className="clicks" title="Clicks">
-            <b>{clicks}</b> {clicks === 1 ? 'click' : 'clicks'}
+        <div className="hud-meta">
+          <span className="hud-stat" title="Clicks">
+            <b>{clicks}</b>
+            <small>{clicks === 1 ? 'click' : 'clicks'}</small>
           </span>
-          {timer}
-        </div>
-        <div className="hud-actions">
+          <span className="hud-stat hud-time">{timer}</span>
           {children}
           {onBack && (
-            <Button size="sm" variant="ghost" onClick={onBack} disabled={!canBack || busy} title="Go back (counts as a click)">
-              ← Back
-            </Button>
+            <button className="hud-btn" onClick={onBack} disabled={!canBack || busy} title="Back (counts as a click)" aria-label="Back">
+              ↩
+            </button>
           )}
           {onGiveUp && (
-            <Button size="sm" variant="ghost" onClick={onGiveUp}>
-              Give up
-            </Button>
+            <button className="hud-btn" onClick={onGiveUp} title="Give up" aria-label="Give up">
+              ✕
+            </button>
           )}
         </div>
       </div>
-      <PathTrail path={path} target={target} />
+      {busy && <div className="hud-progress" aria-hidden />}
       {peek && (
         <div className="hud-peek" onClick={() => setPeek(false)}>
           <PageCard lang={lang} title={target} role="target" />

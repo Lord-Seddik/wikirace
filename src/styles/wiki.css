@@ -569,14 +569,18 @@
 }
 
 .opening {
-  position: sticky;
-  top: calc(var(--nav-h) + 96px);
-  z-index: 5;
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 70;
   display: flex;
   align-items: center;
   gap: 8px;
-  width: fit-content;
-  margin: 0 auto 12px;
+  max-width: calc(100vw - 32px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 8px 14px;
   border-radius: 999px;
   background: #1f2125;

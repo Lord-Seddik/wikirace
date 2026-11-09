@@ -24,7 +24,7 @@ const CURATED: Record<Exclude<ThemeId, 'any'>, Tiers> = {
   history: [
     'World War II|World War I|Roman Empire|Ancient Greece|Ancient Egypt|Middle Ages|Renaissance|Industrial Revolution|Cold War|Soviet Union|French Revolution|Napoleon|British Empire|Ottoman Empire|American Revolution|Holocaust|Byzantine Empire|Mongol Empire|Islamic Golden Age|Crusades',
     'Julius Caesar|Cleopatra|Alexander the Great|Genghis Khan|Queen Victoria|George Washington|Abraham Lincoln|Winston Churchill|Mahatma Gandhi|Nelson Mandela|Martin Luther King Jr.|Joan of Arc|Vikings|Samurai|Knight|Aztec Empire|Maya civilization|Inca Empire|Black Death|Silk Road|Berlin Wall|American Civil War|Apollo 11|Titanic|Magna Carta|Battle of Waterloo|Fall of Constantinople|Emir Abdelkader|Algerian War|Carthage|Hannibal|Saladin|Ibn Battuta|Charlemagne|Spartacus',
-    'Great Emu War|Dancing plague of 1518|Great Molasses Flood|Tunguska event|Voynich manuscript|Antikythera mechanism|Rosetta Stone|Terracotta Army|Nazca Lines|Library of Alexandria|Lighthouse of Alexandria|War of the Bucket|Pig War|Defenestrations of Prague|Year Without a Summer|Christmas truce|Radium Girls|Lindow Man|Ötzi|Code of Hammurabi|Phaistos Disc|Baghdad Battery|Tulip mania|Children\'s Crusade|Siege of Malta|Numidia|Massinissa|Jugurtha|Tin Hinan|Kahina',
+    'Great Emu War|Dancing plague of 1518|Great Molasses Flood|Tunguska event|Voynich manuscript|Antikythera mechanism|Rosetta Stone|Terracotta Army|Nazca Lines|Library of Alexandria|Lighthouse of Alexandria|War of the Bucket|Pig War (1859)|Defenestrations of Prague|Year Without a Summer|Christmas truce|Radium Girls|Lindow Man|Ötzi|Code of Hammurabi|Phaistos Disc|Baghdad Battery|Tulip mania|Children\'s Crusade|Siege of Malta|Numidia|Massinissa|Jugurtha|Tin Hinan|Kahina',
   ],
   science: [
     'Science|Mathematics|Physics|Chemistry|Biology|Earth|Moon|Sun|Solar System|Universe|Star|Planet|Water|Oxygen|Carbon|DNA|Evolution|Electricity|Energy|Medicine|Atom|Gravity|Light|Human|Albert Einstein|Isaac Newton',
@@ -34,11 +34,11 @@ const CURATED: Record<Exclude<ThemeId, 'any'>, Tiers> = {
   nature: [
     'Animal|Plant|Bird|Fish|Mammal|Insect|Dinosaur|Tree|Forest|Ocean|Flower|Dog|Cat|Horse|Fungus|Bacteria',
     'Tiger|Lion|Elephant|Giraffe|Penguin|Shark|Dolphin|Whale|Octopus|Eagle|Wolf|Honey bee|Butterfly|Spider|Snake|Crocodile|Kangaroo|Giant panda|Polar bear|Tyrannosaurus|Cheetah|Gorilla|Chimpanzee|Owl|Parrot|Frog|Coral reef|Rainforest|Bamboo|Rose|Oak|Cactus|Camel|Fennec fox|Barbary macaque',
-    'Platypus|Axolotl|Tardigrade|Narwhal|Capybara|Pangolin|Okapi|Aye-aye|Blobfish|Mantis shrimp|Tetraodontidae|Sloth|Naked mole-rat|Komodo dragon|Dodo|Woolly mammoth|Coelacanth|Venus flytrap|Rafflesia|Baobab|Immortal jellyfish|Pistol shrimp|Bombardier beetle|Lyrebird|Shoebill|Quokka|Dumbo octopus|Glass frog|Hagfish|Welwitschia|Dragon\'s blood tree|Atlas cedar',
+    'Platypus|Axolotl|Tardigrade|Narwhal|Capybara|Pangolin|Okapi|Aye-aye|Psychrolutes marcidus|Mantis shrimp|Tetraodontidae|Sloth|Naked mole-rat|Komodo dragon|Dodo|Woolly mammoth|Coelacanth|Venus flytrap|Rafflesia|Baobab|Immortal jellyfish|Pistol shrimp|Bombardier beetle|Lyrebird|Shoebill|Quokka|Dumbo octopus|Glass frog|Hagfish|Welwitschia|Dragon\'s blood tree|Atlas cedar',
   ],
   culture: [
     'Music|Film|Television|Art|Painting|Novel|Religion|Philosophy|Language|English language|Arabic language|Latin|William Shakespeare|Christianity|Islam|Buddhism|Hinduism|Rock music|Jazz|Architecture|Theatre|Poetry',
-    'The Beatles|Michael Jackson|Elvis Presley|Wolfgang Amadeus Mozart|Ludwig van Beethoven|Taylor Swift|Queen (band)|Star Wars|Harry Potter|The Lord of the Rings|Batman|Superman|Mickey Mouse|Hollywood|The Walt Disney Company|Anime|Manga|Hip hop music|Opera|Ballet|Guitar|Piano|Violin|Christmas|Halloween|Ramadan|Eid al-Fitr|Leonardo da Vinci|Mona Lisa|Pablo Picasso|Vincent van Gogh|Frida Kahlo|One Thousand and One Nights|Raï|Cheb Khaled|Albert Camus|Greek mythology|Norse mythology|Sherlock Holmes|Dracula',
+    'The Beatles|Michael Jackson|Elvis Presley|Wolfgang Amadeus Mozart|Ludwig van Beethoven|Taylor Swift|Queen (band)|Star Wars|Harry Potter|The Lord of the Rings|Batman|Superman|Mickey Mouse|Hollywood, Los Angeles|The Walt Disney Company|Anime|Manga|Hip hop music|Opera|Ballet|Guitar|Piano|Violin|Christmas|Halloween|Ramadan|Eid al-Fitr|Leonardo da Vinci|Mona Lisa|Pablo Picasso|Vincent van Gogh|Frida Kahlo|One Thousand and One Nights|Raï|Cheb Khaled|Albert Camus|Greek mythology|Norse mythology|Sherlock Holmes|Dracula',
     'Theremin|Kazoo|Bagpipes|Didgeridoo|Accordion|Yodeling|Beatboxing|Vaporwave|Barbershop music|Mime artist|Ventriloquism|Juggling|Origami|Esperanto|Braille|Egyptian hieroglyphs|Cuneiform|Morse code|Tifinagh|Klingon language|Rickrolling|Lorem ipsum|Fountain (Duchamp)|The Scream|Bayeux Tapestry|Ship of Theseus|Rubber duck debugging|Flat Earth|Gnome|Garden gnome',
   ],
   sports: [
@@ -53,13 +53,13 @@ const CURATED: Record<Exclude<ThemeId, 'any'>, Tiers> = {
   ],
   food: [
     'Food|Bread|Rice|Wine|Beer|Coffee|Tea|Cheese|Chocolate|Meat|Fruit|Vegetable|Agriculture|Sugar|Salt',
-    'Pizza|Sushi|Hamburger|Banana|Potato|Honey|Pasta|Ice cream|Apple|Tomato|Olive oil|Corn|Milk|Egg as food|Hot dog|French fries|Croissant|Bagel|Ketchup|Popcorn|Avocado|Taco|Curry|Dumpling|Pancake|Couscous|Tagine|Falafel|Hummus|Paella|Kebab|Baklava|Mint tea|Dates (fruit)|Saffron',
-    'Wasabi|Fortune cookie|Marshmallow|Durian|Kimchi|Vegemite|Haggis|Surströmming|Casu martzu|Balut|Century egg|Natto|Tabasco sauce|Twinkie|Spam (food)|Nutella|Jelly Belly|Chewing gum|Pop Rocks|Cotton candy|Hardtack|Garum|Mead|Kombucha|Absinthe|Ghost pepper|Black garlic|Makroudh|Chakhchoukha|Rechta',
+    'Pizza|Sushi|Hamburger|Banana|Potato|Honey|Pasta|Ice cream|Apple|Tomato|Olive oil|Corn|Milk|Egg as food|Hot dog|French fries|Croissant|Bagel|Ketchup|Popcorn|Avocado|Taco|Curry|Dumpling|Pancake|Couscous|Tagine|Falafel|Hummus|Paella|Kebab|Baklava|Maghrebi mint tea|Dates (fruit)|Saffron',
+    'Wasabi|Fortune cookie|Marshmallow|Durian|Kimchi|Vegemite|Haggis|Surströmming|Casu martzu|Balut (food)|Century egg|Natto|Tabasco sauce|Twinkie|Spam (food)|Nutella|Jelly Belly|Chewing gum|Pop Rocks|Cotton candy|Hardtack|Garum|Mead|Kombucha|Absinthe|Ghost pepper|Black garlic|Makroudh|Chakhchoukha|Rechta',
   ],
   oddities: [
-    'Ghost|Magic (supernatural)|Dragon|Pirate|Ninja|Robot|Alien|Vampire|Zombie|Treasure|Superstition|Conspiracy theory',
+    'Ghost|Magic (supernatural)|Dragon|Pirate|Ninja|Robot|Extraterrestrial life|Vampire|Zombie|Treasure|Superstition|Conspiracy theory',
     'Bermuda Triangle|Loch Ness Monster|Bigfoot|Atlantis|El Dorado|Area 51|Roswell incident|Stonehenge|Pyramids of Giza|Easter Island|Bermuda|Yeti|Kraken|Unicorn|Mermaid|Werewolf|Phoenix (mythology)|Holy Grail|Philosopher\'s stone|Flying Dutchman|Dolly (sheep)|Laika|Hachikō|Mr. Bean|Elvis sightings',
-    'Toynbee tiles|Wow! signal|Mary Celeste|Baghdad Battery|Mothman|Chupacabra|Jersey Devil|Bloop|Taos Hum|Max Headroom signal hijacking|Fan death|Spontaneous human combustion|Emu|Rat king|Globster|Crop circle|Boring Billion|Placebo|Hikikomori|Sleep paralysis|Déjà vu|Mandela effect|Bigfoot trap|Stone balancing|Petrichor|Sonder|Tsundoku|Anatidaephobia|Mondegreen|Uncanny valley',
+    'Toynbee tiles|Wow! signal|Mary Celeste|Baghdad Battery|Mothman|Chupacabra|Jersey Devil|Bloop|Taos Hum|Max Headroom signal hijacking|Fan death|Spontaneous human combustion|Emu|Rat king|Globster|Crop circle|Boring Billion|Placebo|Hikikomori|Sleep paralysis|Déjà vu|Mandela effect|Bigfoot trap|Stone balancing|Petrichor|Serendipity|Tsundoku|Anatidaephobia|Mondegreen|Uncanny valley',
   ],
 };
 
@@ -122,7 +122,7 @@ export async function generatePair(lang: string, difficulty: Difficulty, theme: 
     }
     start ??= await randomArticle(lang, rng);
     if (normalizeTitle(start) === normalizeTitle(target)) continue;
-    const resolved = await resolveTitles(lang, [start, target]);
+    const resolved = await resolveTitles(lang, [start, target], { articlesOnly: true });
     const s = resolved.get(start);
     const t = resolved.get(target);
     if (s && t && s !== t) return { start: s, target: t };
@@ -131,7 +131,7 @@ export async function generatePair(lang: string, difficulty: Difficulty, theme: 
     for (let attempt = 0; attempt < 3; attempt++) {
       const c = await candidateOther(lang, difficulty, rng);
       const start = c.start ?? (await randomArticle(lang, rng));
-      const resolved = await resolveTitles(lang, [start, c.target]);
+      const resolved = await resolveTitles(lang, [start, c.target], { articlesOnly: true });
       const s = resolved.get(start);
       const t = resolved.get(c.target);
       if (s && t && s !== t) return { start: s, target: t };
@@ -147,7 +147,7 @@ export async function dailyCandidate(rng: () => number): Promise<Pair> {
     if (a === b) continue;
     const start = pick(tierPool([1, 2], [a]), rng);
     const target = pick(tierPool([1], [b]), rng);
-    const resolved = await resolveTitles('en', [start, target]);
+    const resolved = await resolveTitles('en', [start, target], { articlesOnly: true });
     const s = resolved.get(start);
     const t = resolved.get(target);
     if (s && t && s !== t) return { start: s, target: t };

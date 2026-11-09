@@ -169,17 +169,24 @@ export async function canonicalTitle(lang: string, rawTitle: string): Promise<st
  * Resolve titles to canonical article titles (follows redirects).
  * Returns a map input → canonical title, or null if the article does not exist.
  */
-export async function resolveTitles(lang: string, titles: string[]): Promise<Map<string, string | null>> {
+export async function resolveTitles(lang: string, titles: string[], opts: { articlesOnly?: boolean } = {}): Promise<Map<string, string | null>> {
   const out = new Map<string, string | null>();
   const unique = [...new Set(titles.map(normalizeTitle).filter(Boolean))];
   for (let i = 0; i < unique.length; i += 50) {
     const chunk = unique.slice(i, i + 50);
-    const data = await wikiJson(apiUrl(lang, { action: 'query', titles: chunk.join('|'), redirects: '1' }), 3600);
+    const data = await wikiJson(
+      apiUrl(lang, { action: 'query', titles: chunk.join('|'), redirects: '1', ...(opts.articlesOnly ? { prop: 'pageprops', ppprop: 'disambiguation' } : {}) }),
+      3600,
+    );
     const q = data.query ?? {};
     const norm = new Map<string, string>(((q.normalized ?? []) as { from: string; to: string }[]).map((n) => [n.from, n.to]));
     const redir = new Map<string, string>(((q.redirects ?? []) as { from: string; to: string }[]).map((r) => [r.from, r.to]));
-    const pages = new Map<string, { title: string; missing?: boolean; invalid?: boolean; ns: number }>(
-      ((q.pages ?? []) as { title: string; missing?: boolean; invalid?: boolean; ns: number }[]).map((p) => [p.title, p]),
+    type QPage = { title: string; missing?: boolean; invalid?: boolean; ns: number; pageprops?: Record<string, string> };
+    const pages = new Map<string, QPage>(
+      ((q.pages ?? []) as QPage[])
+        // "X may refer to:" pages make poor start/target pages.
+        .filter((p) => !(opts.articlesOnly && p.pageprops && 'disambiguation' in p.pageprops))
+        .map((p) => [p.title, p]),
     );
     for (const t of chunk) {
       let cur = norm.get(t) ?? t;

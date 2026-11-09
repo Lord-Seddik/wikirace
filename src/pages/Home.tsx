@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { DIFFICULTIES, DIFFICULTY_INFO, LANGS, langInfo, type Difficulty } from '../../shared/constants';
 import type { DailyInfo } from '../../shared/types';
+import { PageThumb, RouteCard } from '../components/race';
 import { Button, LinkButton, Segmented } from '../components/ui';
 import { api } from '../lib/api';
 import { formatClock, plural, toast, useAsync, useNow, useTitle } from '../lib/misc';
@@ -28,7 +29,10 @@ function Example() {
       {route.map((t, n) => (
         <span key={t} className="example-step" style={{ animationDelay: `${n * 0.35}s` }}>
           {n > 0 && <span className="example-arrow">→</span>}
-          <span className={`example-page${n === 0 ? ' start' : n === route.length - 1 ? ' target' : ''}`}>{t}</span>
+          <span className={`example-page${n === 0 ? ' start' : n === route.length - 1 ? ' target' : ''}`}>
+            <PageThumb lang="en" title={t} size={22} />
+            {t}
+          </span>
         </span>
       ))}
       <span className="example-count" style={{ animationDelay: `${route.length * 0.35}s` }}>
@@ -118,11 +122,8 @@ export function HomePage() {
 
       {d && (
         <section className="today">
-          <div>
+          <div className="today-head">
             <span className="eyebrow">Today's challenge</span>
-            <p className="today-pair">
-              {d.start} <span className="today-arrow">→</span> {d.target}
-            </p>
             <p className="muted small">
               {done
                 ? `You did it in ${plural(d.me!.clicks, 'click')}. New one in ${formatClock(d.nextAt - now)}.`
@@ -131,8 +132,9 @@ export function HomePage() {
                   : 'Same pages for everyone, new ones every day.'}
             </p>
           </div>
-          <LinkButton to="/daily" variant={done ? 'secondary' : 'primary'}>
-            {done ? 'See results' : d.me?.status === 'active' ? 'Resume' : 'Play'}
+          <RouteCard lang={d.lang} start={d.start} target={d.target} size="md" />
+          <LinkButton to="/daily" variant={done ? 'secondary' : 'primary'} className="today-btn">
+            {done ? 'See results' : d.me?.status === 'active' ? 'Resume' : "Play today's challenge"}
           </LinkButton>
         </section>
       )}

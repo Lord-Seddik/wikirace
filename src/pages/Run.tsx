@@ -1,7 +1,7 @@
 import { dailyNumber, langInfo } from '../../shared/constants';
 import type { BestKnown, PlayerPublic, RunView } from '../../shared/types';
 import { BestKnownPath, shareTextFor } from '../components/common';
-import { PageCard, PathList } from '../components/race';
+import { PathList, RouteCard } from '../components/race';
 import { Button, Card, ErrorBox, LinkButton, PlayerTag, Spinner } from '../components/ui';
 import { api } from '../lib/api';
 import { copyText, formatDuration, plural, timeAgo, toast, useAsync, useTitle } from '../lib/misc';
@@ -36,11 +36,7 @@ export function RunPage({ id }: { id: string }) {
           {player && <PlayerTag name={player.name} avatar={player.avatar} color={player.color} link={false} />}
         </div>
       </header>
-      <div className="pair">
-        <PageCard lang={run.lang} title={run.start} role="start" compact />
-        <div className="pair-arrow">→</div>
-        <PageCard lang={run.lang} title={run.target} role="target" compact />
-      </div>
+      <RouteCard lang={run.lang} start={run.start} target={run.target} size="md" />
       <Card>
         <div className="result-stats">
           <div>

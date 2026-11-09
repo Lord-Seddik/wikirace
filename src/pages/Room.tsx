@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ClientMessage, PageData, RoomMoveResponse, RoomView } from '../../shared/types';
-import { Article, PageCard, RaceHud, RaceTimer } from '../components/race';
+import { Article, RaceHud, RaceTimer, RouteCard, useRacingMode } from '../components/race';
 import { Button, Card, Empty, LinkButton, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
 import { confetti, copyText, formatDuration, ordinal, plural, sfx, toast, useNow, useTitle } from '../lib/misc';
@@ -136,6 +136,7 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
   const finishedFx = useRef(false);
 
   useEffect(() => window.scrollTo(0, 0), []);
+  useRacingMode();
 
   // Follow the server: initial page, reconnects, or anything newer than what we have.
   useEffect(() => {
@@ -244,11 +245,14 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
         }
       >
         <span className={`conn-dot${connected ? ' on' : ''}`} title={connected ? 'Connected' : 'Reconnecting…'} />
-        <span className="badge">
-          Round {r.index + 1}/{room.settings.rounds}
+        <span className="hud-stat" title="Round">
+          <b>
+            {r.index + 1}/{room.settings.rounds}
+          </b>
+          <small>round</small>
         </span>
-        <button className="btn btn-ghost btn-sm side-toggle" onClick={() => setSideOpen((o) => !o)}>
-          👥 {finishedCount}/{racers}
+        <button className="hud-btn side-toggle" onClick={() => setSideOpen((o) => !o)} title={`Players (${finishedCount}/${racers} done)`} aria-label="Players">
+          👥
         </button>
       </RaceHud>
 
@@ -317,11 +321,7 @@ function RoomRace({ room, connected, send, ticket, emotes }: { room: RoomView; c
             <div className="countdown-n" key={secs}>
               {secs}
             </div>
-            <div className="pair">
-              <PageCard lang={lang} title={r.start} role="start" compact />
-              <div className="pair-arrow">→</div>
-              <PageCard lang={lang} title={r.target} role="target" />
-            </div>
+            <RouteCard lang={lang} start={r.start} target={r.target} size="lg" />
             {!participant && <p className="muted">You're watching this round.</p>}
           </div>
         </div>
@@ -340,9 +340,7 @@ function RoundEnd({ room, send }: { room: RoomView; send: Send }) {
     <div className="lobby">
       <div className="lobby-main">
         <Card title={`Round ${last.index + 1} results`}>
-          <p className="round-pair">
-            {last.start} → <b>{last.target}</b>
-          </p>
+          <RouteCard lang={room.settings.lang} start={last.start} target={last.target} size="sm" />
           {winner ? (
             <p className="round-winner">
               🥇 <b>{winner.name}</b> won in {plural(winner.clicks, 'click')} · {formatDuration(winner.timeMs)}

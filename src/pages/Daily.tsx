@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DailyInfo, LeaderboardEntry } from '../../shared/types';
 import { shareTextFor } from '../components/common';
-import { PageCard } from '../components/race';
+import { RouteCard } from '../components/race';
 import { Avatar, Button, Card, ErrorBox, LinkButton, Spinner } from '../components/ui';
 import { api } from '../lib/api';
 import { copyText, formatClock, formatDuration, ordinal, plural, toast, useAsync, useNow, useTitle } from '../lib/misc';
@@ -66,13 +66,7 @@ export function DailyPage() {
         <p className="muted">Your first try counts. A new one arrives in {formatClock(d.nextAt - now)}.</p>
       </header>
 
-      <div className="pair">
-        <PageCard lang={d.lang} title={d.start} role="start" compact />
-        <div className="pair-arrow" aria-hidden>
-          →
-        </div>
-        <PageCard lang={d.lang} title={d.target} role="target" />
-      </div>
+      <RouteCard lang={d.lang} start={d.start} target={d.target} size="lg" />
 
       <div className="daily-action">
         {!mine && (
